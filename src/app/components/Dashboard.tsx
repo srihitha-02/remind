@@ -59,11 +59,13 @@ import { toast } from 'sonner';
 
 interface DashboardProps {
   userEmail: string;
+  userName: string;
   tasks: Task[];
   onAddTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
   onToggleComplete: (id: string) => void;
   onUpdateTask: (task: Task) => void;
+  onUpdateUser: (newName: string) => void;
 }
 
 type View = 'home' | 'locations' | 'settings' | 'pending' | 'completed' | 'specials' | 'calendar';
@@ -77,11 +79,13 @@ const SNAP_MINUTES = 15;
 
 export function Dashboard({
   userEmail,
+  userName,
   tasks,
   onAddTask,
   onDeleteTask,
   onToggleComplete,
   onUpdateTask,
+  onUpdateUser,
 }: DashboardProps) {
   const [activeView, setActiveView] = useState<View>('home');
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -282,9 +286,9 @@ export function Dashboard({
   // Theme State
   const [theme, setTheme] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('theme') || 'dark';
+      return localStorage.getItem('theme') || 'light';
     }
-    return 'dark';
+    return 'light';
   });
 
   const toggleTheme = () => {
@@ -397,11 +401,7 @@ export function Dashboard({
   }, [tasks, startDate, weekDays]);
 
 
-  // User Name
-  const [userName, setUserName] = useState(() => {
-    const savedName = localStorage.getItem('userName');
-    return savedName || userEmail.split('@')[0];
-  });
+
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-[#1f1f1f] text-gray-900 dark:text-gray-100 overflow-hidden font-sans selection:bg-[#e0b596]/30">
@@ -563,7 +563,7 @@ export function Dashboard({
               onClick={() => setShowProfileMenu(true)}
               className="h-10 w-10 rounded-full bg-gradient-to-br from-[#e0b596] to-[#dcb49a] flex items-center justify-center text-xs font-bold text-[#1f1f1f] border-2 border-white/50 dark:border-[#333] ml-2 shadow-lg hover:shadow-xl hover:scale-110 transition-all cursor-pointer ring-2 ring-transparent hover:ring-[#e0b596]/50"
             >
-              {userName[0].toUpperCase()}
+              {userName && userName.length > 0 ? userName[0].toUpperCase() : 'U'}
             </button>
           </div>
         </header>
@@ -577,6 +577,7 @@ export function Dashboard({
               onClose={() => setShowProfileMenu(false)}
               onLogout={() => {
                 localStorage.removeItem('user');
+                localStorage.removeItem('token');
                 window.location.reload();
               }}
             />
@@ -1173,9 +1174,10 @@ export function Dashboard({
         {showSettings && (
           <SettingsPanel
             userEmail={userEmail}
+            initialName={userName}
             onClose={() => setShowSettings(false)}
-            onNameChange={setUserName}
             onNotificationChange={() => { }}
+            onUpdateUser={onUpdateUser}
           />
         )}
       </AnimatePresence>

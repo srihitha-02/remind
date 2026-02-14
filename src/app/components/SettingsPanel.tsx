@@ -9,16 +9,18 @@ import { toast } from 'sonner';
 
 interface SettingsPanelProps {
   userEmail: string;
+  initialName: string;
   onClose: () => void;
-  onNameChange: (name: string) => void;
   onNotificationChange: (value: boolean) => void;
+  onUpdateUser: (newName: string) => void;
 }
 
 export function SettingsPanel({
   userEmail,
+  initialName,
   onClose,
-  onNameChange,
   onNotificationChange,
+  onUpdateUser,
 }: SettingsPanelProps) {
 
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -35,11 +37,10 @@ export function SettingsPanel({
   }, []);
 
 
-  const [name, setName] = useState(
-    localStorage.getItem('userName') || userEmail.split('@')[0]
-  );
+  const [name, setName] = useState(initialName);
   const [editingName, setEditingName] = useState(false);
   const [showSaveTick, setShowSaveTick] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
 
   const toggleTheme = () => {
@@ -69,10 +70,46 @@ export function SettingsPanel({
     );
   };
 
+  const handleUpdateName = async () => {
+    if (!name.trim()) {
+      toast.error('Name cannot be empty');
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/auth/update-name', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-auth-token': token || '',
+        },
+        body: JSON.stringify({ name: name.trim() }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        onUpdateUser(name.trim());
+        setEditingName(false);
+        setShowSaveTick(false);
+        toast.success('Name updated');
+      } else {
+        toast.error(data.msg || 'Failed to update name');
+      }
+    } catch (error) {
+      console.error('Update name error:', error);
+      toast.error('Server error');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
 
   const handleLogout = () => {
     localStorage.removeItem('user');
+    localStorage.removeItem('token');
     toast.success('Logged out successfully');
     window.location.reload();
   };
@@ -150,20 +187,28 @@ export function SettingsPanel({
                         setName(e.target.value);
                         setShowSaveTick(true);
                       }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleUpdateName();
+                        if (e.key === 'Escape') {
+                          setName(initialName);
+                          setEditingName(false);
+                          setShowSaveTick(false);
+                        }
+                      }}
                       className="w-full bg-transparent border-b border-[#e0b596] text-lg font-semibold text-gray-900 dark:text-white focus:outline-none py-0.5 px-0"
+                      disabled={isUpdating}
                     />
                     {showSaveTick && (
                       <button
-                        onClick={() => {
-                          localStorage.setItem('userName', name);
-                          onNameChange(name);
-                          setEditingName(false);
-                          setShowSaveTick(false);
-                          toast.success('Name updated');
-                        }}
-                        className="absolute right-0 top-1/2 -translate-y-1/2 text-green-500 hover:text-green-600 p-1"
+                        onClick={handleUpdateName}
+                        disabled={isUpdating}
+                        className="absolute right-0 top-1/2 -translate-y-1/2 text-green-500 hover:text-green-600 p-1 disabled:opacity-50"
                       >
-                        <Check className="w-4 h-4" />
+                        {isUpdating ? (
+                          <div className="w-4 h-4 border-2 border-green-500 border-t-transparent animate-spin rounded-full" />
+                        ) : (
+                          <Check className="w-4 h-4" />
+                        )}
                       </button>
                     )}
                   </div>
