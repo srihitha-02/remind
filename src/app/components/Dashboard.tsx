@@ -45,7 +45,8 @@ import {
   Check,
   Edit2,
   Sparkles,
-  Gift
+  Gift,
+  Trash2
 } from 'lucide-react';
 
 import { Task } from '@/app/types';
@@ -472,20 +473,6 @@ export function Dashboard({
 
             {/* Today Navigation Group */}
             <div className={`flex items-center gap-4 ${(activeView !== 'home' && activeView !== 'calendar') ? 'opacity-0 pointer-events-none' : ''}`}>
-              {/* Today Button & Chevrons */}
-              <div className="flex items-center bg-transparent">
-                <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#292929] rounded-md transition-colors mr-2">
-                  Today
-                </button>
-                <div className="flex items-center">
-                  <button onClick={() => setCurrentDate(subWeeks(currentDate, 1))} className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#292929] rounded-full transition-colors">
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
-                  <button onClick={() => setCurrentDate(addWeeks(currentDate, 1))} className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#292929] rounded-full transition-colors">
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
 
               {/* Month/Year Label with Popover Trigger */}
               <div className="relative">
@@ -513,7 +500,7 @@ export function Dashboard({
                         today: new Date()
                       }}
                       modifiersStyles={{
-                        today: { color: '#e0b596', fontWeight: 'bold' },
+                        today: { border: '2px solid #e0b596', fontWeight: 'bold', borderRadius: '50%' },
                         selected: { backgroundColor: '#e0b596', color: 'white' }
                       }}
                       styles={{
@@ -532,20 +519,22 @@ export function Dashboard({
           <div className="flex items-center gap-4">
 
             {/* View Switcher - Teams Style */}
-            <div className="flex bg-gray-100 dark:bg-[#292929] rounded-lg p-1 gap-1">
-              {(['day', 'workWeek', 'week'] as const).map((view) => (
-                <button
-                  key={view}
-                  onClick={() => setCalendarView(view)}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${calendarView === view
-                    ? 'bg-white dark:bg-[#333] text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                    }`}
-                >
-                  {view === 'day' ? 'Day' : view === 'workWeek' ? 'Work Week' : 'Week'}
-                </button>
-              ))}
-            </div>
+            {activeView === 'calendar' && (
+              <div className="flex bg-gray-100 dark:bg-[#292929] rounded-lg p-1 gap-1">
+                {(['day', 'workWeek', 'week'] as const).map((view) => (
+                  <button
+                    key={view}
+                    onClick={() => setCalendarView(view)}
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${calendarView === view
+                      ? 'bg-white dark:bg-[#333] text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                      }`}
+                  >
+                    {view === 'day' ? 'Day' : view === 'workWeek' ? 'Work Week' : 'Week'}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Meet Actions */}
             <div className="flex items-center gap-2">
@@ -603,8 +592,10 @@ export function Dashboard({
                   mode="single"
                   selected={currentDate}
                   onSelect={(date) => date && setCurrentDate(date)}
+                  month={currentDate}
+                  onMonthChange={setCurrentDate}
                   modifiersStyles={{
-                    today: { color: '#e0b596', fontWeight: 'bold' },
+                    today: { border: '2px solid #e0b596', fontWeight: 'bold', borderRadius: '0.5rem' },
                     selected: { backgroundColor: '#e0b596', color: 'white', fontWeight: '600' },
                     festival: { color: '#ef4444', fontWeight: 'bold' }
                   }}
@@ -726,7 +717,7 @@ export function Dashboard({
                                       className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
                                       title="Delete Task"
                                     >
-                                      <X className="w-4 h-4" />
+                                      <Trash2 className="w-4 h-4" />
                                     </button>
                                   </td>
                                 </tr>
