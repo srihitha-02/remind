@@ -13,7 +13,7 @@ router.post('/signup', async (req, res) => {
     email = email.toLowerCase();
 
     try {
-        let user = await User.findOne({ email });
+        let user = await User.findOne({ where: { email } });
 
         if (user) {
             return res.status(400).json({ msg: 'User already exists' });
@@ -22,18 +22,15 @@ router.post('/signup', async (req, res) => {
         // Generate 6-digit OTP for email verification
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-        user = new User({
+        user = await User.create({
             name,
             email,
             password,
             otp,
-            otpExpires: Date.now() + 10 * 60 * 1000, // 10 minutes
+            otpExpires: new Date(Date.now() + 10 * 60 * 1000),
             isVerified: false
         });
 
-        await user.save();
-
-        // Log OTP to console (replace with real email service in production)
         console.log(`---------------------------------------------------`);
         console.log(`EMAIL VERIFICATION FOR: ${email}`);
         console.log(`YOUR OTP IS: ${otp}`);
@@ -55,20 +52,20 @@ router.post('/verify', async (req, res) => {
     email = email.toLowerCase();
 
     try {
-        let user = await User.findOne({ email });
+        let user = await User.findOne({ where: { email } });
 
         if (!user) {
             return res.status(400).json({ msg: 'Invalid email' });
         }
 
-        if (user.otp !== otp || user.otpExpires < Date.now()) {
+        if (user.otp !== otp || user.otpExpires < new Date()) {
             return res.status(400).json({ msg: 'Invalid or expired OTP' });
         }
 
         // Mark as verified
         user.isVerified = true;
-        user.otp = undefined;
-        user.otpExpires = undefined;
+        user.otp = null;
+        user.otpExpires = null;
         await user.save();
 
         const payload = { user: { id: user.id } };
@@ -96,7 +93,7 @@ router.post('/login', async (req, res) => {
     email = email.toLowerCase();
 
     try {
-        let user = await User.findOne({ email });
+        let user = await User.findOne({ where: { email } });
 
         if (!user) {
             return res.status(400).json({ msg: 'Invalid email' });
@@ -137,7 +134,7 @@ router.post('/forgot-password', async (req, res) => {
     email = email.toLowerCase();
 
     try {
-        let user = await User.findOne({ email });
+        let user = await User.findOne({ where: { email } });
 
         if (!user) {
             return res.status(400).json({ msg: 'No account found with that email' });
@@ -145,7 +142,7 @@ router.post('/forgot-password', async (req, res) => {
 
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         user.resetOtp = otp;
-        user.resetOtpExpires = Date.now() + 10 * 60 * 1000;
+        user.resetOtpExpires = new Date(Date.now() + 10 * 60 * 1000);
         await user.save();
 
         console.log(`---------------------------------------------------`);
@@ -169,19 +166,19 @@ router.post('/reset-password', async (req, res) => {
     email = email.toLowerCase();
 
     try {
-        let user = await User.findOne({ email });
+        let user = await User.findOne({ where: { email } });
 
         if (!user) {
             return res.status(400).json({ msg: 'Invalid email' });
         }
 
-        if (user.resetOtp !== otp || user.resetOtpExpires < Date.now()) {
+        if (user.resetOtp !== otp || user.resetOtpExpires < new Date()) {
             return res.status(400).json({ msg: 'Invalid or expired OTP' });
         }
 
         user.password = newPassword;
-        user.resetOtp = undefined;
-        user.resetOtpExpires = undefined;
+        user.resetOtp = null;
+        user.resetOtpExpires = null;
         await user.save();
 
         res.json({ msg: 'Password reset successful. You can now log in.' });
@@ -206,23 +203,19 @@ router.post('/google', async (req, res) => {
         });
 
         const payload = ticket.getPayload();
-        const { email, name, sub: googleId } = payload;
+        const { email, name } = payload;
 
-        // Find or create user
-        let user = await User.findOne({ email: email.toLowerCase() });
+        let user = await User.findOne({ where: { email: email.toLowerCase() } });
 
         if (!user) {
-            // Create new user with a random password (won't be used for Google login)
             const randomPass = require('crypto').randomBytes(32).toString('hex');
-            user = new User({
+            user = await User.create({
                 name: name || email.split('@')[0],
                 email: email.toLowerCase(),
                 password: randomPass,
-                isVerified: true, // Google already verified the email
+                isVerified: true,
             });
-            await user.save();
         } else if (!user.isVerified) {
-            // If user exists but unverified, mark as verified (Google confirms email)
             user.isVerified = true;
             await user.save();
         }
@@ -249,32 +242,29 @@ router.post('/google', async (req, res) => {
 // @access  Public
 const appleSignin = require('apple-signin-auth');
 router.post('/apple', async (req, res) => {
-    const { id_token, code, user: appleUser } = req.body;
+    const { id_token, user: appleUser } = req.body;
 
     try {
         const { email, sub: appleId } = await appleSignin.verifyIdToken(id_token, {
             audience: process.env.APPLE_CLIENT_ID,
-            ignoreExpiration: false, // Ensure token is valid
+            ignoreExpiration: false,
         });
 
-        // Find or create user
-        let user = await User.findOne({ email: email.toLowerCase() });
+        let user = await User.findOne({ where: { email: email.toLowerCase() } });
 
         if (!user) {
-            // Apple only provides the name on the first sign-in
             let name = appleId;
             if (appleUser && appleUser.name) {
                 name = `${appleUser.name.firstName} ${appleUser.name.lastName}`.trim();
             }
 
             const randomPass = require('crypto').randomBytes(32).toString('hex');
-            user = new User({
+            user = await User.create({
                 name: name || email.split('@')[0],
                 email: email.toLowerCase(),
                 password: randomPass,
                 isVerified: true,
             });
-            await user.save();
         } else if (!user.isVerified) {
             user.isVerified = true;
             await user.save();
@@ -309,7 +299,7 @@ router.put('/update-name', auth, async (req, res) => {
     }
 
     try {
-        let user = await User.findById(req.user.id);
+        let user = await User.findByPk(req.user.id);
 
         if (!user) {
             return res.status(404).json({ msg: 'User not found' });

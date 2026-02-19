@@ -8,7 +8,10 @@ const Task = require('../models/Task');
 // @access  Private
 router.get('/', auth, async (req, res) => {
     try {
-        const tasks = await Task.find({ userId: req.user.id }).sort({ createdAt: -1 });
+        const tasks = await Task.findAll({
+            where: { userId: req.user.id },
+            order: [['createdAt', 'DESC']],
+        });
         res.json(tasks);
     } catch (err) {
         console.error(err.message);
@@ -23,17 +26,16 @@ router.post('/', auth, async (req, res) => {
     const { title, description, category, date, time, completed } = req.body;
 
     try {
-        const newTask = new Task({
+        const task = await Task.create({
             userId: req.user.id,
             title,
             description,
             category,
             date,
             time,
-            completed
+            completed,
         });
 
-        const task = await newTask.save();
         res.json(task);
     } catch (err) {
         console.error(err.message);
@@ -47,31 +49,25 @@ router.post('/', auth, async (req, res) => {
 router.put('/:id', auth, async (req, res) => {
     const { title, description, category, date, time, completed } = req.body;
 
-    // Build task object
-    const taskFields = {};
-    if (title !== undefined) taskFields.title = title;
-    if (description !== undefined) taskFields.description = description;
-    if (category !== undefined) taskFields.category = category;
-    if (date !== undefined) taskFields.date = date;
-    if (time !== undefined) taskFields.time = time;
-    if (completed !== undefined) taskFields.completed = completed;
-
     try {
-        let task = await Task.findById(req.params.id);
+        let task = await Task.findByPk(req.params.id);
 
         if (!task) return res.status(404).json({ msg: 'Task not found' });
 
         // Make sure user owns task
-        if (task.userId.toString() !== req.user.id) {
+        if (task.userId !== req.user.id) {
             return res.status(401).json({ msg: 'Not authorized' });
         }
 
-        task = await Task.findByIdAndUpdate(
-            req.params.id,
-            { $set: taskFields },
-            { new: true }
-        );
+        // Update fields
+        if (title !== undefined) task.title = title;
+        if (description !== undefined) task.description = description;
+        if (category !== undefined) task.category = category;
+        if (date !== undefined) task.date = date;
+        if (time !== undefined) task.time = time;
+        if (completed !== undefined) task.completed = completed;
 
+        await task.save();
         res.json(task);
     } catch (err) {
         console.error(err.message);
@@ -84,16 +80,16 @@ router.put('/:id', auth, async (req, res) => {
 // @access  Private
 router.delete('/:id', auth, async (req, res) => {
     try {
-        let task = await Task.findById(req.params.id);
+        let task = await Task.findByPk(req.params.id);
 
         if (!task) return res.status(404).json({ msg: 'Task not found' });
 
         // Make sure user owns task
-        if (task.userId.toString() !== req.user.id) {
+        if (task.userId !== req.user.id) {
             return res.status(401).json({ msg: 'Not authorized' });
         }
 
-        await Task.findByIdAndDelete(req.params.id);
+        await task.destroy();
 
         res.json({ msg: 'Task removed' });
     } catch (err) {

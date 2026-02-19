@@ -1,42 +1,43 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/db');
 
-const TaskSchema = new mongoose.Schema({
+const Task = sequelize.define('Task', {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true,
+    },
     userId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
+        type: DataTypes.INTEGER,
+        allowNull: false,
     },
     title: {
-        type: String,
-        required: true
+        type: DataTypes.STRING,
+        allowNull: false,
     },
     description: {
-        type: String,
-        default: ''
+        type: DataTypes.TEXT,
+        defaultValue: '',
     },
     category: {
-        type: String,
-        required: true
+        type: DataTypes.STRING,
+        allowNull: false,
     },
     date: {
-        type: String,
-        required: true
+        type: DataTypes.STRING,
+        allowNull: false,
     },
     time: {
-        type: String,
-        required: true
+        type: DataTypes.STRING,
+        allowNull: false,
     },
     completed: {
-        type: Boolean,
-        default: false
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
     },
-    createdAt: {
-        type: Date,
-        default: Date.now
-    }
 }, {
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true }
+    tableName: 'tasks',
+    timestamps: true,
 });
 
-module.exports = mongoose.model('Task', TaskSchema);
+module.exports = Task;
