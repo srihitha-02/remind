@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const Task = require('../models/Task');
+const ActivityLog = require('../models/ActivityLog');
 
 // @route   GET api/tasks
 // @desc    Get all tasks for a user
@@ -36,6 +37,13 @@ router.post('/', auth, async (req, res) => {
             completed,
         });
 
+        await ActivityLog.create({
+            userId: req.user.id,
+            action: 'TASK_CREATED',
+            details: { taskId: task.id, title: task.title },
+            ipAddress: req.ip
+        });
+
         res.json(task);
     } catch (err) {
         console.error(err.message);
@@ -68,6 +76,14 @@ router.put('/:id', auth, async (req, res) => {
         if (completed !== undefined) task.completed = completed;
 
         await task.save();
+
+        await ActivityLog.create({
+            userId: req.user.id,
+            action: 'TASK_UPDATED',
+            details: { taskId: task.id, title: task.title },
+            ipAddress: req.ip
+        });
+
         res.json(task);
     } catch (err) {
         console.error(err.message);
@@ -89,7 +105,16 @@ router.delete('/:id', auth, async (req, res) => {
             return res.status(401).json({ msg: 'Not authorized' });
         }
 
+        const taskId = task.id;
+        const taskTitle = task.title;
         await task.destroy();
+
+        await ActivityLog.create({
+            userId: req.user.id,
+            action: 'TASK_DELETED',
+            details: { taskId, title: taskTitle },
+            ipAddress: req.ip
+        });
 
         res.json({ msg: 'Task removed' });
     } catch (err) {

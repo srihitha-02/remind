@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const ActivityLog = require('../models/ActivityLog');
 const { OAuth2Client } = require('google-auth-library');
 
 // @route   POST api/auth/signup
@@ -36,6 +37,13 @@ router.post('/signup', async (req, res) => {
         console.log(`YOUR OTP IS: ${otp}`);
         console.log(`---------------------------------------------------`);
 
+        await ActivityLog.create({
+            userId: user.id,
+            action: 'SIGNUP_INITIATED',
+            details: { email: user.email },
+            ipAddress: req.ip
+        });
+
         res.json({ msg: 'OTP sent to email', email });
 
     } catch (err) {
@@ -67,6 +75,12 @@ router.post('/verify', async (req, res) => {
         user.otp = null;
         user.otpExpires = null;
         await user.save();
+
+        await ActivityLog.create({
+            userId: user.id,
+            action: 'SIGNUP_VERIFIED',
+            ipAddress: req.ip
+        });
 
         const payload = { user: { id: user.id } };
 
@@ -106,8 +120,19 @@ router.post('/login', async (req, res) => {
         const isMatch = await user.matchPassword(password);
 
         if (!isMatch) {
+            await ActivityLog.create({
+                action: 'LOGIN_FAILURE',
+                details: { email, reason: 'Invalid password' },
+                ipAddress: req.ip
+            });
             return res.status(400).json({ msg: 'Invalid password' });
         }
+
+        await ActivityLog.create({
+            userId: user.id,
+            action: 'LOGIN_SUCCESS',
+            ipAddress: req.ip
+        });
 
         const payload = { user: { id: user.id } };
 

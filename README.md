@@ -50,7 +50,7 @@ Start both servers simultaneously:
 **Backend:**
 ```bash
 cd backend
-npm start
+npm run dev
 ```
 
 **Frontend:**
