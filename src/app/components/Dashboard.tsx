@@ -42,8 +42,6 @@ import {
 
   Search,
   CheckCircle,
-  Bell,
-  BellOff,
   Hourglass,
   Check,
   Edit2,
@@ -101,35 +99,6 @@ export function Dashboard({
   const [openInEditMode, setOpenInEditMode] = useState(false);
   const [completedSearchDate, setCompletedSearchDate] = useState<Date | undefined>(undefined);
   const [showCompletedCalendar, setShowCompletedCalendar] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(() => localStorage.getItem('notifications') !== 'false');
-  const [activeNotifications, setActiveNotifications] = useState<{ id: string; title: string; type: string; taskId: string }[]>([]);
-  const [allNotifications, setAllNotifications] = useState<{ id: string; title: string; type: string; taskId: string; timestamp: Date; read: boolean; tag?: string }[]>(() => {
-    const saved = localStorage.getItem('allNotifications');
-    if (!saved) return [];
-    try {
-      const parsed = JSON.parse(saved);
-      return parsed.map((n: any) => ({ ...n, timestamp: new Date(n.timestamp) }));
-    } catch (e) {
-      return [];
-    }
-  });
-  const [showNotificationList, setShowNotificationList] = useState(false);
-  const alertedTasks = useRef<Set<string>>(new Set());
-  const snoozedUntil = useRef<Map<string, Date>>(new Map());
-
-  // Initialize alertedTasks from history to prevent duplicates on reload
-  useEffect(() => {
-    allNotifications.forEach(notif => {
-      if (notif.tag) {
-        alertedTasks.current.add(notif.tag);
-      }
-    });
-  }, []);
-
-  // Sync notifications to localStorage
-  useEffect(() => {
-    localStorage.setItem('allNotifications', JSON.stringify(allNotifications));
-  }, [allNotifications]);
 
   // Teams-like Interaction State
   const containerRef = useRef<HTMLDivElement>(null);
@@ -337,148 +306,6 @@ export function Dashboard({
     // Initialize theme on mount
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
-
-  // Notification Logic
-  useEffect(() => {
-    // Logic always runs to populate history, but alerts are conditional
-
-    const checkTasks = () => {
-      const now = new Date();
-      const todayStr = format(now, 'yyyy-MM-dd');
-
-      tasks.forEach(task => {
-        if (task.completed || task.date !== todayStr || !task.time) return;
-
-        // Parse metadata for duration if not directly available
-        let taskDuration = task.duration || 0;
-        const match = task.description?.match(/<!-- metadata: (.+) -->/);
-        if (match) {
-          try {
-            const meta = JSON.parse(match[1]);
-            if (meta.duration) taskDuration = meta.duration;
-          } catch (e) { }
-        }
-
-        const [hours, minutes] = task.time.split(':').map(Number);
-        const taskTime = new Date(now);
-        taskTime.setHours(hours, minutes, 0, 0);
-
-        const diffMinutes = differenceInMinutes(taskTime, now);
-        const taskId = task.id;
-
-        const addNotifIfNew = (title: string, type: string, suffix: string) => {
-          const alertTag = `${taskId}-${suffix}`;
-          if (alertedTasks.current.has(alertTag)) return;
-
-          const newNotif = {
-            id: Math.random().toString(36).substr(2, 9),
-            title,
-            type,
-            taskId,
-            timestamp: new Date(),
-            read: false,
-            tag: alertTag
-          };
-
-          // Always add to history
-          setAllNotifications(prev => [newNotif, ...prev]);
-
-          // Conditionally add to pop-ups (active alerts)
-          if (notificationsEnabled) {
-            setActiveNotifications(prev => [...prev, newNotif]);
-            // Auto-dismiss after 5 seconds
-            setTimeout(() => {
-              setActiveNotifications(prev => prev.filter(n => n.id !== newNotif.id));
-            }, 5000);
-          }
-
-          alertedTasks.current.add(alertTag);
-        };
-
-        // Mutual exclusivity logic based on priority: Overdue > Started > Upcoming
-        const endTime = addMinutes(taskTime, taskDuration);
-        const diffEndMinutes = differenceInMinutes(endTime, now);
-
-        // 1. Overdue (After end time)
-        if (diffEndMinutes < 0) {
-          addNotifIfNew(`Overdue: ${task.title} was scheduled until ${format(endTime, 'HH:mm')}`, 'overdue', 'overdue');
-          return; // Skip other notifications for this task if overdue
-        }
-
-        // 2. Exactly at Time (Catch-up if missed within 12 hours)
-        if (diffMinutes <= 0 && diffMinutes > -720) {
-          // Check if snoozed
-          const snoozeTime = snoozedUntil.current.get(`${taskId}-now`);
-          if (snoozeTime && new Date() < snoozeTime) {
-            // Still snoozing
-          } else {
-            addNotifIfNew(`Task Time: ${task.title} has started!`, 'now', 'now');
-          }
-          return; // Skip upcoming if already started
-        }
-
-        // 3. 5 Minutes Before (Strictly in the future)
-        if (diffMinutes <= 5 && diffMinutes > 0) {
-          addNotifIfNew(`Reminder: ${task.title} starts in 5 minutes!`, 'upcoming', '5m');
-        }
-      });
-    };
-
-    const interval = setInterval(checkTasks, 15000); // Check every 15 seconds
-    checkTasks(); // Initial check
-
-    return () => clearInterval(interval);
-  }, [tasks, notificationsEnabled]);
-
-  const removeNotification = (id: string, fromHistory = false) => {
-    if (fromHistory) {
-      setAllNotifications(prev => prev.filter(n => n.id !== id));
-    } else {
-      setActiveNotifications(prev => prev.filter(n => n.id !== id));
-    }
-  };
-
-  // Global click to dismiss notifications and list
-  useEffect(() => {
-    const handleGlobalClick = () => {
-      if (activeNotifications.length > 0) {
-        setActiveNotifications([]);
-      }
-      if (showNotificationList) {
-        setShowNotificationList(false);
-      }
-    };
-
-    window.addEventListener('click', handleGlobalClick);
-    return () => window.removeEventListener('click', handleGlobalClick);
-  }, [activeNotifications.length, showNotificationList]);
-
-  // Mark all as read when opening list
-  useEffect(() => {
-    if (showNotificationList && allNotifications.some(n => !n.read)) {
-      setAllNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    }
-  }, [showNotificationList]);
-
-  const clearAllNotifications = () => {
-    setAllNotifications([]);
-  };
-
-  const handleSnooze = (id: string, taskId: string, type: string) => {
-    if (type !== 'now') return; // Only snooze start time alerts
-
-    // Set snooze for 5 minutes
-    const wakeup = new Date(Date.now() + 5 * 60000);
-    snoozedUntil.current.set(`${taskId}-now`, wakeup);
-
-    // Remove from active alerts immediately
-    setActiveNotifications(prev => prev.filter(n => n.id !== id));
-
-    // Clear from alertedTasks so it can fire again after snooze
-    alertedTasks.current.delete(`${taskId}-now`);
-
-    toast.success('Notification snoozed for 5 minutes');
-  };
 
 
   // --- Event Layout Logic (Overlaps) ---
@@ -714,97 +541,6 @@ export function Dashboard({
 
             {/* Meet Actions */}
             <div className="flex items-center gap-2">
-              <div className="relative">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowNotificationList(!showNotificationList);
-                  }}
-                  className={`p-2 rounded-xl transition-all hover:brightness-110 ${notificationsEnabled ? 'text-[#e0b596] bg-[#e0b596]/10' : 'text-gray-400 bg-gray-100 dark:bg-[#292929]'}`}
-                  title="Notifications"
-                >
-                  {notificationsEnabled ? <Bell className="w-5 h-5" /> : <BellOff className="w-5 h-5" />}
-                  {allNotifications.filter(n => !n.read).length > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 rounded-full border-2 border-white dark:border-[#1f1f1f] text-[10px] font-bold text-white flex items-center justify-center">
-                      {allNotifications.filter(n => !n.read).length}
-                    </span>
-                  )}
-                </button>
-
-                <AnimatePresence>
-                  {showNotificationList && (
-                    <motion.div
-                      onClick={(e) => e.stopPropagation()}
-                      initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                      className="absolute right-0 mt-3 w-80 bg-white dark:bg-[#292929] border border-gray-200 dark:border-[#333] rounded-2xl shadow-2xl z-[60] overflow-hidden"
-                    >
-                      <div className="p-4 border-b border-gray-100 dark:border-[#333] flex items-center justify-between bg-gray-50/50 dark:bg-[#1f1f1f]">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-gray-900 dark:text-white">Notifications</h3>
-                          {allNotifications.filter(n => !n.read).length > 0 && (
-                            <span className="text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold">
-                              {allNotifications.filter(n => !n.read).length} NEW
-                            </span>
-                          )}
-                        </div>
-                        {allNotifications.length > 0 && (
-                          <button
-                            onClick={clearAllNotifications}
-                            className="text-xs text-[#e0b596] hover:underline font-medium"
-                          >
-                            Clear All
-                          </button>
-                        )}
-                      </div>
-                      <ScrollArea className="max-h-[400px]">
-                        {allNotifications.length > 0 ? (
-                          <div className="divide-y divide-gray-50 dark:divide-[#333]">
-                            {allNotifications.map((notif) => (
-                              <div key={notif.id} className={`p-4 hover:bg-gray-50 dark:hover:bg-[#1f1f1f] transition-colors group flex items-start gap-3 relative ${!notif.read ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''}`}>
-                                <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${notif.type === 'upcoming' ? 'bg-blue-500' :
-                                  notif.type === 'now' ? 'bg-green-500' : 'bg-red-500'
-                                  }`} />
-                                <div className="flex-1">
-                                  <p className="text-sm font-medium text-gray-900 dark:text-white leading-tight">{notif.title}</p>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <p className="text-[10px] text-gray-400 uppercase tracking-wider">{format(notif.timestamp, 'h:mm a')}</p>
-                                    {!notif.read && (
-                                      <span className="w-1.5 h-1.5 bg-[#e0b596] rounded-full" />
-                                    )}
-                                    {notif.type === 'now' && (
-                                      <button
-                                        onClick={() => handleSnooze(notif.id, notif.taskId, notif.type)}
-                                        className="text-[10px] font-bold text-[#e0b596] hover:underline bg-[#e0b596]/10 px-1.5 py-0.5 rounded ml-2"
-                                      >
-                                        Snooze 5m
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                                <button
-                                  onClick={() => removeNotification(notif.id, true)}
-                                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-100 dark:hover:bg-[#333] rounded transition-all shrink-0"
-                                >
-                                  <X className="w-3 h-3 text-gray-400" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="py-12 px-4 text-center">
-                            <div className="w-12 h-12 bg-gray-50 dark:bg-[#333] rounded-full flex items-center justify-center mx-auto mb-3">
-                              <Bell className="w-6 h-6 text-gray-300" />
-                            </div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">No notifications yet</p>
-                          </div>
-                        )}
-                      </ScrollArea>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
               <button
                 className="flex items-center gap-2 px-4 py-1.5 bg-gradient-to-b from-[#e0b596]/90 to-[#c69472]/90 text-[#1f1f1f] shadow-[0_10px_20px_rgba(224,181,150,0.4),inset_0_1px_0_rgba(255,255,255,0.6)] border border-white/20 border-t-white/60 hover:brightness-110 hover:scale-[1.05] backdrop-blur-xl transition-all duration-300 rounded-xl text-sm font-semibold"
                 onClick={() => setCreateModal({ isOpen: true, duration: 30 })}
@@ -1515,62 +1251,11 @@ export function Dashboard({
               userEmail={userEmail}
               initialName={userName}
               onClose={() => setShowSettings(false)}
-              onNotificationChange={(value) => setNotificationsEnabled(value)}
+              onNotificationChange={() => { }}
               onUpdateUser={onUpdateUser}
             />
           )
         }
-
-        {/* Notification Overlay */}
-        <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none">
-          <AnimatePresence>
-            {activeNotifications.map((notif) => (
-              <motion.div
-                key={notif.id}
-                initial={{ opacity: 0, x: 100, scale: 0.9 }}
-                animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, x: 100, scale: 0.9 }}
-                className={`pointer-events-auto min-w-[320px] max-w-md p-4 rounded-2xl shadow-2xl border backdrop-blur-xl flex items-start gap-4 ring-1 ring-black/5 dark:ring-white/10 ${notif.type === 'upcoming'
-                  ? 'bg-blue-50/90 dark:bg-blue-900/40 border-blue-200 dark:border-blue-800'
-                  : notif.type === 'now'
-                    ? 'bg-green-50/90 dark:bg-green-900/40 border-green-200 dark:border-green-800'
-                    : 'bg-red-50/90 dark:bg-red-900/40 border-red-200 dark:border-red-800'
-                  }`}
-              >
-                <div className={`p-2 rounded-full ${notif.type === 'upcoming' ? 'bg-blue-500 text-white' :
-                  notif.type === 'now' ? 'bg-green-500 text-white' :
-                    'bg-red-500 text-white'
-                  }`}>
-                  <Bell className="w-5 h-5" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-bold text-gray-900 dark:text-white leading-tight">
-                    {notif.title}
-                  </h4>
-                  <div className="flex items-center gap-3 mt-1">
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                      Check your tasks for more details.
-                    </p>
-                    {notif.type === 'now' && (
-                      <button
-                        onClick={() => handleSnooze(notif.id, notif.taskId, notif.type)}
-                        className="text-xs font-bold text-[#e0b596] hover:underline bg-[#e0b596]/10 px-2 py-0.5 rounded"
-                      >
-                        Snooze 5m
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <button
-                  onClick={() => removeNotification(notif.id)}
-                  className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
       </AnimatePresence >
     </div >
   );
