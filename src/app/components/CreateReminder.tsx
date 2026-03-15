@@ -1,110 +1,260 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/app/components/ui/button';
-import { Input } from '@/app/components/ui/input';
-import { format, addMinutes, differenceInMinutes, parseISO, parse, isValid } from 'date-fns';
+import { format, parse, isSameDay, addMinutes, max, isBefore, subMinutes, startOfDay } from 'date-fns';
 import {
   Calendar as CalendarIcon,
   Clock,
   MapPin,
   AlignLeft,
   Repeat,
-  User,
   X,
-  Check,
-  AlertCircle,
-  Sparkles
+  ChevronDown,
+  ChevronRight,
+  Info,
+  CircleAlert
 } from 'lucide-react';
 import { Task } from '@/app/types';
 import { toast } from 'sonner';
+import { DayPicker } from 'react-day-picker';
 
 interface CreateReminderProps {
+  tasks: Task[];
   onCreateTask: (task: Task) => void;
   initialDate?: string;
-  initialTime?: string; // Expects "HH:mm" from grid
-  initialDuration?: number; // minutes
+  initialTime?: string;
+  initialDuration?: number;
   onClose?: () => void;
-  existingTask?: Task | null; // For editing mode if we merge content
 }
 
-// Generate 15-minute intervals for 24 hours in 12-hour format
-const generateTimeOptions = () => {
-  const options = [];
-  for (let h = 0; h < 24; h++) {
-    for (let m = 0; m < 60; m += 15) {
-      const date = new Date();
-      date.setHours(h);
-      date.setMinutes(m);
-      const value = format(date, 'HH:mm'); // Internal value
-      const label = format(date, 'h:mm a'); // Display value
-      options.push({ value, label });
-    }
-  }
-  return options;
-};
+interface DatePickerProps {
+  value: string;
+  onChange: (value: string) => void;
+}
 
-const TIME_OPTIONS = generateTimeOptions();
+function DatePicker({ value, onChange }: DatePickerProps) {
+  const [show, setShow] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const parsedDate = parse(value, 'yyyy-MM-dd', new Date());
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setShow(false);
+    };
+    if (show) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [show]);
+
+  return (
+    <div className="relative flex-1" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setShow(!show)}
+        className="w-full text-left text-[13px] font-semibold focus:outline-none hover:text-[#e0b596] transition-colors whitespace-nowrap bg-transparent"
+      >
+        {format(parsedDate, 'dd-MM-yyyy')}
+      </button>
+
+      <AnimatePresence>
+        {show && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className="absolute top-full left-0 mt-1.5 p-1 bg-white dark:bg-[#292929] border border-gray-200 dark:border-[#333] rounded-2xl shadow-2xl z-50 min-w-max"
+          >
+            <DayPicker
+              mode="single"
+              selected={parsedDate}
+              onSelect={(date) => {
+                if (date) {
+                  onChange(format(date, 'yyyy-MM-dd'));
+                  setShow(false);
+                }
+              }}
+              disabled={(date) => isBefore(startOfDay(date), startOfDay(new Date()))}
+              modifiers={{ today: new Date() }}
+              modifiersStyles={{
+                today: { border: '2px solid #e0b596', fontWeight: 'bold', borderRadius: '50%' },
+                selected: { backgroundColor: '#e0b596', color: 'white' }
+              }}
+              className="!m-0 text-[12px] p-2 [&_.rdp-button]:h-6 [&_.rdp-button]:w-6 [&_.rdp-head_cell]:h-6 [&_.rdp-head_cell]:w-6 [&_.rdp-head_cell]:text-[10px] [&_.rdp-caption_label]:text-[13px] [&_.rdp-day]:text-[12px] [&_.rdp-day]:text-gray-900 dark:[&_.rdp-day]:text-gray-100 [&_.rdp-caption_label]:text-gray-900 dark:[&_.rdp-caption_label]:text-gray-100"
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+interface TimePickerProps {
+  value: string;
+  onChange: (value: string) => void;
+  label?: string;
+}
+
+function TimePicker({ value, onChange }: TimePickerProps) {
+  const [show, setShow] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const hRef = useRef<HTMLDivElement>(null);
+  const mRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setShow(false);
+    };
+    if (show) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [show]);
+
+  useEffect(() => {
+    if (show) {
+      const h = parseInt(format(parse(value, 'HH:mm', new Date()), 'h'));
+      const m = parseInt(format(parse(value, 'HH:mm', new Date()), 'mm'));
+      if (hRef.current) hRef.current.scrollTop = (h - 1) * 32;
+      if (mRef.current) mRef.current.scrollTop = m * 32;
+    }
+  }, [show, value]);
+
+  const updateTime = (h: string, m: string, p: string) => {
+    onChange(format(parse(`${h}:${m} ${p}`, 'h:mm a', new Date()), 'HH:mm'));
+  };
+
+  const currentTime = parse(value, 'HH:mm', new Date());
+  const hVal = format(currentTime, 'h');
+  const mVal = format(currentTime, 'mm');
+  const pVal = format(currentTime, 'a');
+
+  return (
+    <div className="relative flex-1" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setShow(!show)}
+        className="w-full text-left text-[13px] font-semibold focus:outline-none hover:text-[#e0b596] transition-colors whitespace-nowrap"
+      >
+        {format(currentTime, 'hh:mm a')}
+      </button>
+
+      <AnimatePresence>
+        {show && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className="absolute top-full left-0 mt-1 p-2 bg-white dark:bg-[#292929] border border-gray-200 dark:border-[#333] rounded-[1.5rem] shadow-2xl z-50 flex flex-col gap-1.5 min-w-[140px]"
+          >
+            <div className="flex items-center justify-center gap-1 h-24 relative">
+              <div className="absolute inset-x-0.5 top-1/2 -translate-y-1/2 h-8 bg-[#e0b596]/10 rounded-lg pointer-events-none" />
+              
+              <div ref={hRef} className="flex-1 h-full overflow-y-auto no-scrollbar snap-y snap-mandatory scroll-smooth py-8">
+                {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+                  <div 
+                    key={h} 
+                    className="h-8 flex items-center justify-center snap-center text-[12px] font-bold cursor-pointer"
+                    onClick={() => updateTime(h.toString(), mVal, pVal)}
+                  >
+                    {h.toString().padStart(2, '0')}
+                  </div>
+                ))}
+              </div>
+
+              <div className="text-[#e0b596] font-bold text-[12px]">:</div>
+
+              <div ref={mRef} className="flex-1 h-full overflow-y-auto no-scrollbar snap-y snap-mandatory scroll-smooth py-8">
+                {Array.from({ length: 60 }, (_, i) => i).map(m => (
+                  <div 
+                    key={m} 
+                    className="h-8 flex items-center justify-center snap-center text-[12px] font-bold cursor-pointer"
+                    onClick={() => updateTime(hVal, m.toString().padStart(2, '0'), pVal)}
+                  >
+                    {m.toString().padStart(2, '0')}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-col gap-0.5 ml-1">
+                {['AM', 'PM'].map(p => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => updateTime(hVal, mVal, p)}
+                    className={`px-2 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${pVal === p ? 'bg-[#e0b596] text-white shadow-sm' : 'hover:bg-gray-100 dark:hover:bg-white/5 text-gray-400'}`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Button onClick={() => setShow(false)} className="w-full py-1 h-7 text-[10px] font-bold rounded-lg bg-[#e0b596]/10 text-[#e0b596] hover:bg-[#e0b596]/20 border border-[#e0b596]/20 mt-1">
+              Done
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 export function CreateReminder({
+  tasks,
   onCreateTask,
   initialDate,
   initialTime,
   initialDuration = 30,
   onClose
 }: CreateReminderProps) {
-
-  // State
   const [title, setTitle] = useState('');
-
-  // Date/Time Logic
   const [startDate, setStartDate] = useState(initialDate || format(new Date(), 'yyyy-MM-dd'));
-  const [startTime, setStartTime] = useState(initialTime || format(new Date(), 'HH:00')); // Internal HH:mm
-
+  const [startTime, setStartTime] = useState(() => {
+    if (initialTime) return initialTime;
+    const now = new Date();
+    // Default to the next available 30-min slot if today, or current hour
+    return format(addMinutes(now, 5), 'HH:mm');
+  });
+  
   const [endDate, setEndDate] = useState(initialDate || format(new Date(), 'yyyy-MM-dd'));
   const [endTime, setEndTime] = useState(() => {
-    if (initialTime) {
-      const start = new Date(`${initialDate || format(new Date(), 'yyyy-MM-dd')}T${initialTime}`);
-      return format(addMinutes(start, initialDuration), 'HH:mm');
-    }
-    return format(addMinutes(new Date(), 30), 'HH:mm');
+    const start = parse(initialTime || format(addMinutes(new Date(), 5), 'HH:mm'), 'HH:mm', new Date());
+    return format(addMinutes(start, initialDuration), 'HH:mm');
   });
 
-  const [isAllDay, setIsAllDay] = useState(false);
   const [location, setLocation] = useState('');
   const [description, setDescription] = useState('');
   const [repeat, setRepeat] = useState('never');
-  const [priority, setPriority] = useState('normal');
-  const [isSpecial, setIsSpecial] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
 
-  // Calculate Duration to store
-  const getDuration = () => {
-    const start = new Date(`${startDate}T${startTime}`);
-    const end = new Date(`${endDate}T${endTime}`);
-    return Math.max(0, differenceInMinutes(end, start));
+  // Sync End Time when Start Time changes
+  const handleStartTimeChange = (newStartTime: string) => {
+    const prevStart = parse(startTime, 'HH:mm', new Date());
+    const prevEnd = parse(endTime, 'HH:mm', new Date());
+    const duration = Math.max(30, (prevEnd.getTime() - prevStart.getTime()) / (1000 * 60));
+    
+    setStartTime(newStartTime);
+    const nextStart = parse(newStartTime, 'HH:mm', new Date());
+    setEndTime(format(addMinutes(nextStart, duration), 'HH:mm'));
   };
+
+  const tasksForDay = tasks.filter(t => t.date === startDate).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title) {
-      toast.error('Title is required');
+      toast.error('Please enter a title');
       return;
     }
 
-    // Metadata packing into description for persistence without backend changes
-    // Format: "Real description... \n\n[Meta] Location: X | Duration: Y | AllDay: Z"
-    const duration = getDuration();
-    const metaData = JSON.stringify({
-      location,
-      duration,
-      isAllDay,
-      repeat,
-      priority,
-      isSpecial,
-      specialType: isSpecial ? 'other' : undefined
-    });
+    const start = parse(`${startDate} ${startTime}`, 'yyyy-MM-dd HH:mm', new Date());
+    const end = parse(`${endDate} ${endTime}`, 'yyyy-MM-dd HH:mm', new Date());
 
-    // We append a hidden-ish string or just purely textual
-    const finalDescription = `${description.trim()}\n\n<!-- metadata: ${metaData} -->`;
+    if (isBefore(start, subMinutes(new Date(), 1))) {
+      toast.error('Cannot create tasks in the past');
+      return;
+    }
+
+    const finalDuration = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60));
+
+    const metaData = JSON.stringify({ location, duration: finalDuration, repeat, endDate, endTime });
+    const finalDescription = description.trim() ? `${description.trim()}\n\n<!-- metadata: ${metaData} -->` : `<!-- metadata: ${metaData} -->`;
 
     const newTask: Task = {
       id: Date.now().toString(),
@@ -112,12 +262,11 @@ export function CreateReminder({
       description: finalDescription,
       date: startDate,
       time: startTime,
-      category: 'work', // Default to work or simulate detection
+      category: 'work',
       completed: false,
       createdAt: new Date().toISOString(),
-      duration: duration,
+      duration: finalDuration,
       location: location,
-      isAllDay: isAllDay
     };
 
     onCreateTask(newTask);
@@ -126,193 +275,195 @@ export function CreateReminder({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white/60 dark:bg-black/60 backdrop-blur-3xl text-gray-900 dark:text-[#f5f5f5] rounded-3xl overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.3)] border border-white/40 dark:border-white/10 bg-gradient-to-b from-white/40 to-white/10 dark:from-white/5 dark:to-transparent ring-1 ring-white/50 dark:ring-white/10">
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200/50 dark:border-[#333]">
-        <h2 className="text-xl font-semibold tracking-tight">New event</h2>
-        <button onClick={onClose} className="p-1 hover:bg-[#333] rounded-md transition-colors">
-          <X className="w-5 h-5 text-gray-400" />
-        </button>
-      </div>
+    <div className="flex flex-col md:flex-row bg-white dark:bg-[#1b1b1b] text-gray-900 dark:text-[#f5f5f5] rounded-[2rem] overflow-hidden shadow-2xl border border-gray-200 dark:border-[#292929] max-w-2xl w-full mx-auto h-full">
+      <div className="flex-[1.5] flex flex-col p-6 md:p-8 space-y-5 overflow-y-auto custom-scrollbar">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Reminder</h2>
+          <button onClick={onClose} className="md:hidden p-2 hover:bg-gray-100 dark:hover:bg-[#292929] rounded-full transition-colors">
+            <X className="w-6 h-6 text-gray-400" />
+          </button>
+        </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-
-        {/* Title Section */}
-        <div className="space-y-2">
+        <div className="space-y-5">
           <input
             type="text"
-            placeholder="Add title"
-            className="w-full bg-transparent text-3xl font-semibold placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none border-b border-transparent focus:border-[#e0b596] transition-colors pb-2"
+            placeholder="What's the plan?"
+            className="w-full bg-transparent text-3xl font-bold placeholder:text-gray-300 dark:placeholder:text-gray-600 focus:outline-none focus:ring-0 border-none p-0 selection:bg-[#e0b596]/30"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             autoFocus
           />
-        </div>
 
-        {/* Attendees (Simulated) */}
-        <div className="flex items-center gap-3 text-gray-400">
-          <User className="w-5 h-5" />
-          <input
-            type="text"
-            placeholder="Add required attendees"
-            className="bg-transparent w-full focus:outline-none text-gray-900 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm"
-          />
-        </div>
-
-        {/* Date/Time Grid */}
-        <div className="space-y-4 py-2">
-          <div className="flex items-center gap-4">
-            <Clock className="w-5 h-5 text-gray-400 mt-1" />
-            <div className="flex-1 space-y-3">
-              {/* Start */}
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-400 w-10">Start</span>
-                <div className="flex items-center gap-2 bg-gray-100 dark:bg-[#292929] rounded px-3 py-1.5 border border-transparent hover:border-gray-300 dark:hover:border-[#444] transition-colors">
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="bg-transparent text-sm focus:outline-none invert-calendar"
-                  />
-                  <select
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    className="bg-transparent text-sm focus:outline-none appearance-none ml-2 cursor-pointer w-[80px]"
-                  >
-                    {TIME_OPTIONS.map((opt) => (
-                      <option key={`start-${opt.value}`} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          <div className="space-y-2">
+            {/* Start Row */}
+            <div className="flex items-center gap-2">
+              <div className="flex-[1.8] flex items-center gap-2 bg-gray-50 dark:bg-[#252525] px-3 py-2 rounded-2xl border border-gray-100 dark:border-[#333]">
+                <CalendarIcon className="w-4 h-4 text-[#e0b596]" />
+                <DatePicker
+                  value={startDate}
+                  onChange={(val) => {
+                    setStartDate(val);
+                    setEndDate(val);
+                  }}
+                />
               </div>
+              <div className="flex-1 flex items-center gap-2 bg-gray-50 dark:bg-[#252525] px-3 py-2 rounded-2xl border border-gray-100 dark:border-[#333]">
+                <Clock className="w-4 h-4 text-[#e0b596]" />
+                <TimePicker value={startTime} onChange={handleStartTimeChange} />
+              </div>
+            </div>
 
-              {/* End */}
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-400 w-10">End</span>
-                <div className="flex items-center gap-2 bg-gray-100 dark:bg-[#292929] rounded px-3 py-1.5 border border-transparent hover:border-gray-300 dark:hover:border-[#444] transition-colors">
-                  <input
-                    type="date"
+            {/* End Row */}
+            <div className="flex items-center gap-2">
+              <div className="flex-[1.8] flex items-center gap-2 bg-gray-50 dark:bg-[#252525] px-3 py-2 rounded-2xl border border-gray-100 dark:border-[#333]">
+                <CalendarIcon className="w-4 h-4 text-gray-400 opacity-50" />
+                <div className="opacity-50 flex-1 flex">
+                  <DatePicker
                     value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="bg-transparent text-sm focus:outline-none invert-calendar"
+                    onChange={setEndDate}
                   />
-                  <select
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    className="bg-transparent text-sm focus:outline-none appearance-none ml-2 cursor-pointer w-[80px]"
-                  >
-                    {TIME_OPTIONS.map((opt) => (
-                      <option key={`end-${opt.value}`} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
                 </div>
               </div>
-
-              {/* All Day Toggle */}
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="allDay"
-                  checked={isAllDay}
-                  onChange={(e) => setIsAllDay(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-400 dark:border-gray-600 bg-gray-100 dark:bg-[#292929] text-[#e0b596] focus:ring-[#e0b596]"
-                />
-                <label htmlFor="allDay" className="text-sm text-gray-700 dark:text-gray-300">All day</label>
-              </div>
-
-              {/* Add to Specials Toggle */}
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="isSpecial"
-                  checked={isSpecial}
-                  onChange={(e) => setIsSpecial(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-400 dark:border-gray-600 bg-gray-100 dark:bg-[#292929] text-[#e0b596] focus:ring-[#e0b596]"
-                />
-                <label htmlFor="isSpecial" className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                  <Sparkles className="w-3.5 h-3.5 text-orange-400" />
-                  Add to Specials
-                </label>
+              <div className="flex-1 flex items-center gap-2 bg-gray-50 dark:bg-[#252525] px-3 py-2 rounded-2xl border border-gray-100 dark:border-[#333]">
+                <Clock className="w-4 h-4 text-gray-400 opacity-50" />
+                <TimePicker value={endTime} onChange={setEndTime} />
               </div>
             </div>
           </div>
 
-          {/* Repeat */}
-          <div className="flex items-center gap-4">
-            <Repeat className="w-5 h-5 text-gray-400" />
-            <select
-              value={repeat}
-              onChange={(e) => setRepeat(e.target.value)}
-              className="bg-transparent text-sm text-gray-900 dark:text-gray-200 focus:outline-none w-full border-b border-transparent focus:border-[#e0b596] py-1"
-            >
-              <option value="never">Does not repeat</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="yearly">Yearly</option>
-            </select>
-          </div>
-
-          {/* Location */}
-          <div className="flex items-center gap-4">
-            <MapPin className="w-5 h-5 text-gray-400" />
+          <div className="flex items-center gap-2 bg-gray-50 dark:bg-[#252525] p-3.5 rounded-2xl border border-gray-100 dark:border-[#333]">
+            <MapPin className="w-5 h-5 text-[#e0b596]" />
             <input
               type="text"
               placeholder="Add location"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="bg-transparent text-sm text-gray-900 dark:text-gray-200 focus:outline-none w-full border-b border-transparent focus:border-[#e0b596] py-1 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+              className="bg-transparent text-sm font-medium focus:outline-none w-full placeholder:text-gray-400 dark:placeholder:text-gray-600"
             />
           </div>
 
-          {/* Description */}
-          <div className="flex items-start gap-4 pt-2">
-            <AlignLeft className="w-5 h-5 text-gray-400 mt-1" />
-            <textarea
-              placeholder="Type details for this new event"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="flex-1 bg-transparent text-sm text-gray-900 dark:text-gray-200 focus:outline-none min-h-[120px] resize-none placeholder:text-gray-400 dark:placeholder:text-gray-500"
-            />
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowMoreOptions(!showMoreOptions)}
+            className="flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-[#e0b596] transition-colors"
+          >
+            {showMoreOptions ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            More options
+          </button>
+
+          <AnimatePresence>
+            {showMoreOptions && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden space-y-2"
+              >
+                <div className="flex items-center gap-2 bg-gray-50 dark:bg-[#252525] p-3.5 rounded-2xl border border-gray-100 dark:border-[#333]">
+                  <Repeat className="w-5 h-5 text-[#e0b596]" />
+                  <select
+                    value={repeat}
+                    onChange={(e) => setRepeat(e.target.value)}
+                    className="bg-transparent text-sm font-medium focus:outline-none w-full appearance-none cursor-pointer"
+                  >
+                    <option value="never">Does not repeat</option>
+                    <option value="daily">Every day</option>
+                    <option value="weekly">Every week</option>
+                    <option value="monthly">Every month</option>
+                  </select>
+                </div>
+                <div className="flex items-start gap-2 bg-gray-50 dark:bg-[#252525] p-3.5 rounded-2xl border border-gray-100 dark:border-[#333]">
+                  <AlignLeft className="w-5 h-5 text-[#e0b596] mt-0.5" />
+                  <textarea
+                    placeholder="Add notes..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="bg-transparent text-sm font-medium focus:outline-none w-full min-h-[80px] resize-none placeholder:text-gray-400 dark:placeholder:text-gray-600"
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <div className="pt-2 flex items-center justify-between mt-4">
+          <Button variant="ghost" onClick={onClose} className="text-gray-400 text-sm font-bold hover:text-gray-600 dark:hover:text-white">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            className="bg-[#e0b596] hover:bg-[#d4a37f] text-white text-sm font-bold px-10 py-5 h-auto rounded-2xl shadow-lg transition-all transform hover:scale-105 active:scale-95"
+          >
+            Create Task
+          </Button>
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-gray-200/50 dark:border-[#333] flex justify-end gap-3 bg-gray-50/50 dark:bg-[#1f1f1f]">
-        <Button
-          variant="ghost"
-          onClick={onClose}
-          className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200/50 dark:hover:bg-[#333]"
-        >
-          Close
-        </Button>
-        <Button
-          onClick={handleSubmit}
-          className="bg-gradient-to-b from-[#e0b596]/90 to-[#c69472]/90 text-[#1f1f1f] px-8 py-2 rounded-xl shadow-[0_10px_20px_rgba(224,181,150,0.4),inset_0_1px_0_rgba(255,255,255,0.6)] hover:shadow-[0_15px_30px_rgb(224,181,150,0.4)] hover:brightness-110 backdrop-blur-xl transition-all duration-300 ease-out border border-white/20 border-t-white/60 hover:scale-[1.05]"
-        >
-          Save
-        </Button>
+      <div className="hidden md:flex flex-1 max-w-[240px] bg-gray-50 dark:bg-[#232323] border-l border-gray-200 dark:border-[#292929] flex-col">
+        <div className="p-5 border-b border-gray-200 dark:border-[#292929] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-xs text-gray-500 uppercase tracking-widest">Schedule</h3>
+            <span className="text-[10px] bg-[#e0b596]/10 text-[#e0b596] px-2 py-1 rounded-full font-bold">
+              {format(parse(startDate, 'yyyy-MM-dd', new Date()), 'MMM d')}
+            </span>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-white dark:hover:bg-[#333] rounded-md transition-colors text-gray-400">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
+          {tasksForDay.length > 0 ? (
+            <div className="relative pl-5 border-l-2 border-gray-200 dark:border-[#333] space-y-8">
+              {tasksForDay.map((task) => (
+                <div key={task.id} className="relative">
+                  <div className="absolute -left-[25px] top-1 w-3.5 h-3.5 rounded-full bg-white dark:bg-[#1b1b1b] border-2 border-[#e0b596]" />
+                  <div className="space-y-1">
+                    <span className="text-xs font-bold text-[#e0b596] uppercase tracking-tighter">
+                      {task.time ? format(parse(task.time, 'HH:mm', new Date()), 'h:mm a') : '--'}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <p className={`text-base font-semibold leading-tight text-gray-800 dark:text-gray-200 ${task.completed ? 'line-through opacity-50' : ''}`}>
+                        {task.title}
+                      </p>
+                      {!task.completed && isBefore(parse(`${task.date} ${task.time || '00:00'}`, 'yyyy-MM-dd HH:mm', new Date()), new Date()) && (
+                        <CircleAlert className="w-3.5 h-3.5 text-amber-500/80" />
+                      )}
+                    </div>
+                    {task.location && (
+                      <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                        <MapPin className="w-3 h-3" />
+                        {task.location}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {isSameDay(parse(startDate, 'yyyy-MM-dd', new Date()), new Date()) && (
+                <div className="relative">
+                  <div className="absolute -left-[25px] top-1 w-3.5 h-3.5 rounded-full bg-[#ef4444] shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
+                  <span className="text-xs font-bold text-red-500 uppercase">Now</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-40">
+              <div className="w-14 h-14 bg-gray-200 dark:bg-[#333] rounded-2xl flex items-center justify-center">
+                <Info className="w-8 h-8 text-gray-400" />
+              </div>
+              <p className="text-base font-medium text-gray-400">No events scheduled<br />for this day.</p>
+            </div>
+          )}
+        </div>
+        <div className="p-5 bg-white dark:bg-[#1b1b1b] border-t border-gray-200 dark:border-[#292929]">
+          <p className="text-xs text-gray-400 leading-tight">
+            Reviewing your schedule helps you avoid conflicts and plan your day more effectively.
+          </p>
+        </div>
       </div>
 
-      {/* Styles for inverted calendar icon in date input if needed */}
       <style>{`
-        .invert-calendar::-webkit-calendar-picker-indicator {
-            filter: invert(1);
-            opacity: 0.5;
-            cursor: pointer;
-        }
-        .invert-calendar::-webkit-calendar-picker-indicator:hover {
-            opacity: 1;
-        }
-        .dark .invert-calendar::-webkit-calendar-picker-indicator {
-            filter: invert(1);
-            opacity: 0.5;
-        }
+        /* Overrides if any */
       `}</style>
     </div>
   );

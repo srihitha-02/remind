@@ -24,7 +24,7 @@ router.get('/', auth, async (req, res) => {
 // @desc    Create a new task
 // @access  Private
 router.post('/', auth, async (req, res) => {
-    const { title, description, category, date, time, completed } = req.body;
+    const { title, description, category, date, time, duration, location, isAllDay, isSpecial, specialType, notifyAt, notifyBefore, completed } = req.body;
 
     try {
         const task = await Task.create({
@@ -34,6 +34,13 @@ router.post('/', auth, async (req, res) => {
             category,
             date,
             time,
+            duration,
+            location,
+            isAllDay,
+            isSpecial,
+            specialType,
+            notifyAt,
+            notifyBefore,
             completed,
         });
 
@@ -55,7 +62,7 @@ router.post('/', auth, async (req, res) => {
 // @desc    Update a task
 // @access  Private
 router.put('/:id', auth, async (req, res) => {
-    const { title, description, category, date, time, completed } = req.body;
+    const { title, description, category, date, time, duration, location, isAllDay, isSpecial, specialType, notifyAt, notifyBefore, completed } = req.body;
 
     try {
         let task = await Task.findByPk(req.params.id);
@@ -73,6 +80,13 @@ router.put('/:id', auth, async (req, res) => {
         if (category !== undefined) task.category = category;
         if (date !== undefined) task.date = date;
         if (time !== undefined) task.time = time;
+        if (duration !== undefined) task.duration = duration;
+        if (location !== undefined) task.location = location;
+        if (isAllDay !== undefined) task.isAllDay = isAllDay;
+        if (isSpecial !== undefined) task.isSpecial = isSpecial;
+        if (specialType !== undefined) task.specialType = specialType;
+        if (notifyAt !== undefined) task.notifyAt = notifyAt;
+        if (notifyBefore !== undefined) task.notifyBefore = notifyBefore;
         if (completed !== undefined) task.completed = completed;
 
         await task.save();
