@@ -34,6 +34,7 @@ export default function App() {
       });
       if (res.ok) {
         const data = await res.json();
+        console.log('Fetched tasks:', data); // Added logging
         setTasks(data);
       }
     } catch (err) {

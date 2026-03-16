@@ -12,8 +12,10 @@ import {
   ChevronDown,
   ChevronRight,
   Info,
-  CircleAlert
+  CircleAlert,
+  Sparkles
 } from 'lucide-react';
+import { Switch } from '@/app/components/ui/switch';
 import { Task } from '@/app/types';
 import { toast } from 'sonner';
 import { DayPicker } from 'react-day-picker';
@@ -221,6 +223,7 @@ export function CreateReminder({
   const [location, setLocation] = useState('');
   const [description, setDescription] = useState('');
   const [repeat, setRepeat] = useState('never');
+  const [isSpecial, setIsSpecial] = useState(false);
   const [showMoreOptions, setShowMoreOptions] = useState(false);
 
   // Sync End Time when Start Time changes
@@ -253,7 +256,7 @@ export function CreateReminder({
 
     const finalDuration = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60));
 
-    const metaData = JSON.stringify({ location, duration: finalDuration, repeat, endDate, endTime });
+    const metaData = JSON.stringify({ location, duration: finalDuration, repeat, endDate, endTime, isSpecial });
     const finalDescription = description.trim() ? `${description.trim()}\n\n<!-- metadata: ${metaData} -->` : `<!-- metadata: ${metaData} -->`;
 
     const newTask: Task = {
@@ -267,6 +270,7 @@ export function CreateReminder({
       createdAt: new Date().toISOString(),
       duration: finalDuration,
       location: location,
+      isSpecial: isSpecial,
     };
 
     onCreateTask(newTask);
@@ -379,6 +383,20 @@ export function CreateReminder({
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     className="bg-transparent text-sm font-medium focus:outline-none w-full min-h-[80px] resize-none placeholder:text-gray-400 dark:placeholder:text-gray-600"
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-2 bg-purple-50/50 dark:bg-purple-900/10 p-3.5 rounded-2xl border border-purple-100 dark:border-purple-800/30">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-purple-500" />
+                    <div>
+                      <p className="text-sm font-bold text-purple-700 dark:text-purple-300">Mark as special</p>
+                      <p className="text-[10px] text-purple-600/70 dark:text-purple-400/50 leading-tight">Highlight this task with an icon and unique color</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={isSpecial}
+                    onCheckedChange={setIsSpecial}
+                    className="data-[state=checked]:bg-purple-500"
                   />
                 </div>
               </motion.div>

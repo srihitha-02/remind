@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/app/components/ui/button';
 import { Badge } from '@/app/components/ui/badge';
@@ -18,7 +18,7 @@ import {
   CircleAlert
 } from 'lucide-react';
 import { Task } from '@/app/types';
-import { format, parse, isSameDay, addMinutes, isBefore } from 'date-fns';
+import { format, parse, isSameDay, addMinutes, isBefore, subMinutes } from 'date-fns';
 import { toast } from 'sonner';
 import { DayPicker } from 'react-day-picker';
 
@@ -194,14 +194,14 @@ export function TaskDetails({
   const [isEditing, setIsEditing] = useState(initialEditMode);
 
   // Helper to parse metadata
-  const parsedMetadata = (() => {
+  const parsedMetadata = useMemo(() => {
     const desc = task.description || '';
     const match = desc.match(/<!-- metadata: (.+) -->/);
     if (match) {
       try { return JSON.parse(match[1]); } catch (e) { return null; }
     }
     return null;
-  })();
+  }, [task.description]);
 
   const [title, setTitle] = useState(task.title);
   const [startDate, setStartDate] = useState(task.date);
@@ -214,6 +214,7 @@ export function TaskDetails({
   const [isSpecial, setIsSpecial] = useState(parsedMetadata?.isSpecial || false);
   const [showMoreOptions, setShowMoreOptions] = useState(false);
 
+  // Refined useEffect to only reset state when switching to edit mode or changing tasks
   useEffect(() => {
     if (isEditing) {
       setTitle(task.title);
@@ -226,7 +227,9 @@ export function TaskDetails({
       setRepeat(parsedMetadata?.repeat || 'never');
       setIsSpecial(parsedMetadata?.isSpecial || false);
     }
-  }, [isEditing, task, parsedMetadata]);
+    // We only want to re-run this when the task itself changes or we START editing
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task.id, isEditing]);
 
   const handleStartTimeChange = (newStartTime: string) => {
     const prevStart = parse(startTime, 'HH:mm', new Date());
@@ -318,7 +321,7 @@ export function TaskDetails({
 
               {/* End Row */}
               <div className="flex items-center gap-2">
-                <div className="flex-[1.8] flex items-center gap-2 bg-gray-50 dark:bg-[#252525] px-3 py-2 rounded-2xl border border-gray-100 dark:border-[#333] opacity-50">
+                <div className={`flex-[1.8] flex items-center gap-2 bg-gray-50 dark:bg-[#252525] px-3 py-2 rounded-2xl border border-gray-100 dark:border-[#333] ${!isEditing ? 'opacity-80' : ''}`}>
                   <CalendarIcon className="w-4 h-4 text-gray-400" />
                   {isEditing ? (
                     <DatePicker value={endDate} onChange={setEndDate} />
@@ -326,7 +329,7 @@ export function TaskDetails({
                     <span className="text-[13px] font-semibold">{format(parse(endDate, 'yyyy-MM-dd', new Date()), 'dd-MM-yyyy')}</span>
                   )}
                 </div>
-                <div className="flex-1 flex items-center gap-2 bg-gray-50 dark:bg-[#252525] px-3 py-2 rounded-2xl border border-gray-100 dark:border-[#333] opacity-50">
+                <div className={`flex-1 flex items-center gap-2 bg-gray-50 dark:bg-[#252525] px-3 py-2 rounded-2xl border border-gray-100 dark:border-[#333] ${!isEditing ? 'opacity-80' : ''}`}>
                   <Clock className="w-4 h-4 text-gray-400" />
                   {isEditing ? (
                     <TimePicker value={endTime} onChange={setEndTime} />
@@ -437,18 +440,25 @@ export function TaskDetails({
                     onClick={() => {
                       const start = parse(`${startDate} ${startTime}`, 'yyyy-MM-dd HH:mm', new Date());
                       const end = parse(`${endDate} ${endTime}`, 'yyyy-MM-dd HH:mm', new Date());
+                      
+                      const now = new Date();
+                      if (isBefore(start, subMinutes(now, 1))) {
+                        toast.error('Tasks can only be scheduled for a future time');
+                        return;
+                      }
+
                       const finalDuration = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60));
                       const metaData = JSON.stringify({ location, duration: finalDuration, repeat, endDate, endTime, isSpecial });
                       const finalDescription = description.trim() ? `${description.trim()}\n\n<!-- metadata: ${metaData} -->` : `<!-- metadata: ${metaData} -->`;
-
-                      onUpdateTask({
+                       onUpdateTask({
                         ...task,
                         title,
                         description: finalDescription,
                         date: startDate,
                         time: startTime,
                         location,
-                        duration: finalDuration
+                        duration: finalDuration,
+                        isSpecial
                       });
                       toast.success('Changes saved');
                       setIsEditing(false);
