@@ -32,9 +32,10 @@ interface CreateReminderProps {
 interface DatePickerProps {
   value: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }
 
-function DatePicker({ value, onChange }: DatePickerProps) {
+function DatePicker({ value, onChange, disabled }: DatePickerProps) {
   const [show, setShow] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const parsedDate = parse(value, 'yyyy-MM-dd', new Date());
@@ -51,19 +52,22 @@ function DatePicker({ value, onChange }: DatePickerProps) {
     <div className="relative flex-1" ref={ref}>
       <button
         type="button"
-        onClick={() => setShow(!show)}
-        className="w-full text-left text-[13px] font-semibold focus:outline-none hover:text-[#e0b596] transition-colors whitespace-nowrap bg-transparent"
+        disabled={disabled}
+        onClick={() => !disabled && setShow(!show)}
+        className={`w-full text-left text-[13px] font-bold focus:outline-none whitespace-nowrap transition-colors bg-gray-50/50 dark:bg-[#252525] px-3 py-2 rounded-2xl flex items-center justify-between group border border-gray-100 dark:border-white/5 shadow-sm active:scale-[0.98] transition-all
+          ${disabled ? 'cursor-not-allowed opacity-50' : 'hover:border-[#e0b596]/30 hover:text-[#e0b596]'}`}
       >
-        {format(parsedDate, 'dd-MM-yyyy')}
+        <span>{format(parsedDate, 'dd-MM-yyyy')}</span>
+        <CalendarIcon className={`w-3.5 h-3.5 transition-colors ${disabled ? 'text-gray-300' : 'text-gray-400 group-hover:text-[#e0b596]'}`} />
       </button>
 
       <AnimatePresence>
         {show && (
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            initial={{ opacity: 0, y: 5, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            className="absolute top-full left-0 mt-1.5 p-1 bg-white dark:bg-[#292929] border border-gray-200 dark:border-[#333] rounded-2xl shadow-2xl z-50 min-w-max"
+            exit={{ opacity: 0, y: 5, scale: 0.98 }}
+            className="absolute top-full left-0 mt-1.5 p-1 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] rounded-[1rem] shadow-2xl z-50 min-w-max"
           >
             <DayPicker
               mode="single"
@@ -93,13 +97,16 @@ interface TimePickerProps {
   value: string;
   onChange: (value: string) => void;
   label?: string;
+  disabled?: boolean;
 }
 
-function TimePicker({ value, onChange }: TimePickerProps) {
+function TimePicker({ value, onChange, disabled }: TimePickerProps) {
   const [show, setShow] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const hRef = useRef<HTMLDivElement>(null);
   const mRef = useRef<HTMLDivElement>(null);
+  const pRef = useRef<HTMLDivElement>(null);
+  const isScrollingRef = useRef(false);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -109,17 +116,63 @@ function TimePicker({ value, onChange }: TimePickerProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [show]);
 
+  const ITEM_HEIGHT = 28;
+
   useEffect(() => {
-    if (show) {
-      const h = parseInt(format(parse(value, 'HH:mm', new Date()), 'h'));
-      const m = parseInt(format(parse(value, 'HH:mm', new Date()), 'mm'));
-      if (hRef.current) hRef.current.scrollTop = (h - 1) * 32;
-      if (mRef.current) mRef.current.scrollTop = m * 32;
+    if (show && !isScrollingRef.current) {
+      setTimeout(() => {
+        const currentTime = parse(value, 'HH:mm', new Date());
+        const h = parseInt(format(currentTime, 'h'));
+        const m = parseInt(format(currentTime, 'mm'));
+        const p = format(currentTime, 'a');
+        
+        if (hRef.current) hRef.current.scrollTop = (h - 1) * ITEM_HEIGHT;
+        if (mRef.current) mRef.current.scrollTop = m * ITEM_HEIGHT;
+        if (pRef.current) pRef.current.scrollTop = (p === 'AM' ? 0 : 1) * ITEM_HEIGHT;
+      }, 50);
     }
-  }, [show, value]);
+  }, [show]);
 
   const updateTime = (h: string, m: string, p: string) => {
-    onChange(format(parse(`${h}:${m} ${p}`, 'h:mm a', new Date()), 'HH:mm'));
+    const formattedHour = h.padStart(1, '0');
+    const formattedMinute = m.padStart(2, '0');
+    try {
+      const parsed = parse(`${formattedHour}:${formattedMinute} ${p}`, 'h:mm a', new Date());
+      onChange(format(parsed, 'HH:mm'));
+    } catch (e) {}
+  };
+
+  const handleScroll = (type: 'h' | 'm' | 'p') => {
+    const targetRef = type === 'h' ? hRef : (type === 'm' ? mRef : pRef);
+    if (!targetRef.current) return;
+
+    isScrollingRef.current = true;
+    const scrollPos = targetRef.current.scrollTop;
+    const index = Math.round(scrollPos / ITEM_HEIGHT);
+    
+    const currentTime = parse(value, 'HH:mm', new Date());
+    const hVal = format(currentTime, 'h');
+    const mVal = format(currentTime, 'mm');
+    const pVal = format(currentTime, 'a');
+
+    if (type === 'h') {
+      const newH = (index + 1).toString();
+      if (newH !== hVal && index >= 0 && index < 12) {
+        updateTime(newH, mVal, pVal);
+      }
+    } else if (type === 'm') {
+      const newM = index.toString().padStart(2, '0');
+      if (newM !== mVal && index >= 0 && index < 60) {
+        updateTime(hVal, newM, pVal);
+      }
+    } else {
+      const newP = index === 0 ? 'AM' : 'PM';
+      if (newP !== pVal && (index === 0 || index === 1)) {
+        updateTime(hVal, mVal, newP);
+      }
+    }
+    
+    setTimeout(() => { isScrollingRef.current = false; }, 200);
   };
 
   const currentTime = parse(value, 'HH:mm', new Date());
@@ -131,64 +184,87 @@ function TimePicker({ value, onChange }: TimePickerProps) {
     <div className="relative flex-1" ref={ref}>
       <button
         type="button"
-        onClick={() => setShow(!show)}
-        className="w-full text-left text-[13px] font-semibold focus:outline-none hover:text-[#e0b596] transition-colors whitespace-nowrap"
+        disabled={disabled}
+        onClick={() => !disabled && setShow(!show)}
+        className={`w-full text-left text-[13px] font-bold focus:outline-none whitespace-nowrap bg-gray-50/50 dark:bg-[#252525] px-3 py-2 rounded-2xl flex items-center justify-between group border border-gray-100 dark:border-white/5 shadow-sm active:scale-[0.98] transition-all
+          ${disabled ? 'cursor-not-allowed opacity-50' : 'hover:border-[#e0b596]/30 hover:text-[#e0b596]'}`}
       >
-        {format(currentTime, 'hh:mm a')}
+        <span>{format(currentTime, 'hh:mm a')}</span>
+        <Clock className={`w-3.5 h-3.5 transition-colors ${disabled ? 'text-gray-300' : 'text-gray-400 group-hover:text-[#e0b596]'}`} />
       </button>
 
       <AnimatePresence>
         {show && (
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            initial={{ opacity: 0, y: 5, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            className="absolute top-full left-0 mt-1 p-2 bg-white dark:bg-[#292929] border border-gray-200 dark:border-[#333] rounded-[1.5rem] shadow-2xl z-50 flex flex-col gap-1.5 min-w-[140px]"
+            exit={{ opacity: 0, y: 5, scale: 0.98 }}
+            className="absolute top-full left-0 mt-1.5 p-1.5 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] rounded-[1rem] shadow-2xl z-50 flex flex-col gap-1.5 w-[120px]"
           >
-            <div className="flex items-center justify-center gap-1 h-24 relative">
-              <div className="absolute inset-x-0.5 top-1/2 -translate-y-1/2 h-8 bg-[#e0b596]/10 rounded-lg pointer-events-none" />
+            <div className="flex items-center justify-center h-28 relative bg-gray-50 dark:bg-black/20 rounded-lg overflow-hidden border border-gray-100 dark:border-white/5">
+              {/* Highlight Overlay */}
+              <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[28px] bg-[#e0b596]/10 border-y border-[#e0b596]/20 pointer-events-none rounded-sm" />
               
-              <div ref={hRef} className="flex-1 h-full overflow-y-auto no-scrollbar snap-y snap-mandatory scroll-smooth py-8">
-                {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
-                  <div 
-                    key={h} 
-                    className="h-8 flex items-center justify-center snap-center text-[12px] font-bold cursor-pointer"
-                    onClick={() => updateTime(h.toString(), mVal, pVal)}
-                  >
-                    {h.toString().padStart(2, '0')}
-                  </div>
-                ))}
-              </div>
+              <div className="flex flex-1 items-center justify-center relative h-full">
+                {/* Hours */}
+                <div 
+                  ref={hRef} 
+                  onScroll={() => handleScroll('h')}
+                  className="w-8 h-full overflow-y-auto no-scrollbar snap-y snap-mandatory py-[42px] touch-pan-y"
+                >
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+                    <div 
+                      key={h} 
+                      className={`h-[28px] flex items-center justify-center snap-center text-[11px] font-bold transition-all ${hVal === h.toString() ? 'text-[#e0b596]' : 'text-black dark:text-white opacity-40'}`}
+                    >
+                      {h.toString().padStart(2, '0')}
+                    </div>
+                  ))}
+                </div>
 
-              <div className="text-[#e0b596] font-bold text-[12px]">:</div>
+                <div className="text-[#e0b596] font-bold opacity-30 select-none text-[10px] px-0.5">:</div>
 
-              <div ref={mRef} className="flex-1 h-full overflow-y-auto no-scrollbar snap-y snap-mandatory scroll-smooth py-8">
-                {Array.from({ length: 60 }, (_, i) => i).map(m => (
-                  <div 
-                    key={m} 
-                    className="h-8 flex items-center justify-center snap-center text-[12px] font-bold cursor-pointer"
-                    onClick={() => updateTime(hVal, m.toString().padStart(2, '0'), pVal)}
-                  >
-                    {m.toString().padStart(2, '0')}
-                  </div>
-                ))}
-              </div>
+                {/* Minutes */}
+                <div 
+                  ref={mRef} 
+                  onScroll={() => handleScroll('m')}
+                  className="w-8 h-full overflow-y-auto no-scrollbar snap-y snap-mandatory py-[42px] touch-pan-y"
+                >
+                  {Array.from({ length: 60 }, (_, i) => i).map(m => (
+                    <div 
+                      key={m} 
+                      className={`h-[28px] flex items-center justify-center snap-center text-[11px] font-bold transition-all ${mVal === m.toString().padStart(2, '0') ? 'text-[#e0b596]' : 'text-black dark:text-white opacity-40'}`}
+                    >
+                      {m.toString().padStart(2, '0')}
+                    </div>
+                  ))}
+                </div>
 
-              <div className="flex flex-col gap-0.5 ml-1">
-                {['AM', 'PM'].map(p => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => updateTime(hVal, mVal, p)}
-                    className={`px-2 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${pVal === p ? 'bg-[#e0b596] text-white shadow-sm' : 'hover:bg-gray-100 dark:hover:bg-white/5 text-gray-400'}`}
-                  >
-                    {p}
-                  </button>
-                ))}
+                <div className="w-1" />
+
+                {/* AM/PM Scrollable */}
+                <div 
+                  ref={pRef} 
+                  onScroll={() => handleScroll('p')}
+                  className="w-8 h-full overflow-y-auto no-scrollbar snap-y snap-mandatory py-[42px] touch-pan-y"
+                >
+                  {['AM', 'PM'].map(p => (
+                    <div 
+                      key={p} 
+                      className={`h-[28px] flex items-center justify-center snap-center text-[9px] font-black transition-all ${pVal === p ? 'text-[#e0b596]' : 'text-black dark:text-white opacity-40'}`}
+                    >
+                      {p}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-            <Button onClick={() => setShow(false)} className="w-full py-1 h-7 text-[10px] font-bold rounded-lg bg-[#e0b596]/10 text-[#e0b596] hover:bg-[#e0b596]/20 border border-[#e0b596]/20 mt-1">
-              Done
+            
+            <Button 
+                onClick={() => setShow(false)} 
+                className="w-full h-7 bg-[#e0b596] hover:bg-[#d4a37f] text-white text-[10px] font-bold rounded-lg shadow-sm active:scale-95 transition-all"
+            >
+              Set Time
             </Button>
           </motion.div>
         )}
@@ -209,14 +285,12 @@ export function CreateReminder({
   const [startDate, setStartDate] = useState(initialDate || format(new Date(), 'yyyy-MM-dd'));
   const [startTime, setStartTime] = useState(() => {
     if (initialTime) return initialTime;
-    const now = new Date();
-    // Default to the next available 30-min slot if today, or current hour
-    return format(addMinutes(now, 5), 'HH:mm');
+    return format(new Date(), 'HH:mm');
   });
   
   const [endDate, setEndDate] = useState(initialDate || format(new Date(), 'yyyy-MM-dd'));
   const [endTime, setEndTime] = useState(() => {
-    const start = parse(initialTime || format(addMinutes(new Date(), 5), 'HH:mm'), 'HH:mm', new Date());
+    const start = parse(initialTime || format(new Date(), 'HH:mm'), 'HH:mm', new Date());
     return format(addMinutes(start, initialDuration), 'HH:mm');
   });
 
@@ -237,7 +311,12 @@ export function CreateReminder({
     setEndTime(format(addMinutes(nextStart, duration), 'HH:mm'));
   };
 
-  const tasksForDay = tasks.filter(t => t.date === startDate).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+  const tasksForDay = tasks.filter(t => t.date === startDate);
+
+  const allScheduleItems = [
+    ...tasksForDay.map(t => ({ ...t, isPreview: false })),
+    { id: 'preview-now', time: startTime, title: title, isPreview: true }
+  ].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -301,55 +380,42 @@ export function CreateReminder({
           <div className="space-y-2">
             {/* Start Row */}
             <div className="flex items-center gap-2">
-              <div className="flex-[1.8] flex items-center gap-2 bg-gray-50 dark:bg-[#252525] px-3 py-2 rounded-2xl border border-gray-100 dark:border-[#333]">
-                <CalendarIcon className="w-4 h-4 text-[#e0b596]" />
-                <DatePicker
-                  value={startDate}
-                  onChange={(val) => {
-                    setStartDate(val);
-                    setEndDate(val);
-                  }}
-                />
-              </div>
-              <div className="flex-1 flex items-center gap-2 bg-gray-50 dark:bg-[#252525] px-3 py-2 rounded-2xl border border-gray-100 dark:border-[#333]">
-                <Clock className="w-4 h-4 text-[#e0b596]" />
-                <TimePicker value={startTime} onChange={handleStartTimeChange} />
-              </div>
+              <DatePicker
+                value={startDate}
+                onChange={(val) => {
+                  setStartDate(val);
+                  setEndDate(val);
+                }}
+              />
+              <TimePicker value={startTime} onChange={handleStartTimeChange} />
             </div>
 
             {/* End Row */}
             <div className="flex items-center gap-2">
-              <div className="flex-[1.8] flex items-center gap-2 bg-gray-50 dark:bg-[#252525] px-3 py-2 rounded-2xl border border-gray-100 dark:border-[#333]">
-                <CalendarIcon className="w-4 h-4 text-gray-400 opacity-50" />
-                <div className="opacity-50 flex-1 flex">
-                  <DatePicker
-                    value={endDate}
-                    onChange={setEndDate}
-                  />
-                </div>
-              </div>
-              <div className="flex-1 flex items-center gap-2 bg-gray-50 dark:bg-[#252525] px-3 py-2 rounded-2xl border border-gray-100 dark:border-[#333]">
-                <Clock className="w-4 h-4 text-gray-400 opacity-50" />
-                <TimePicker value={endTime} onChange={setEndTime} />
-              </div>
+              <DatePicker
+                value={endDate}
+                onChange={setEndDate}
+                disabled={true}
+              />
+              <TimePicker value={endTime} onChange={setEndTime} />
             </div>
           </div>
 
-          <div className="flex items-center gap-2 bg-gray-50 dark:bg-[#252525] p-3.5 rounded-2xl border border-gray-100 dark:border-[#333]">
-            <MapPin className="w-5 h-5 text-[#e0b596]" />
+          <div className="flex items-center gap-2 bg-gray-50 dark:bg-[#252525] px-3 py-2 rounded-2xl border border-gray-100 dark:border-[#333] shadow-sm">
+            <MapPin className="w-4 h-4 text-[#e0b596]" />
             <input
               type="text"
               placeholder="Add location"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="bg-transparent text-sm font-medium focus:outline-none w-full placeholder:text-gray-400 dark:placeholder:text-gray-600"
+              className="bg-transparent text-[13px] font-bold focus:outline-none w-full placeholder:text-gray-400 dark:placeholder:text-gray-600 border-none p-0"
             />
           </div>
 
           <button
             type="button"
             onClick={() => setShowMoreOptions(!showMoreOptions)}
-            className="flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-[#e0b596] transition-colors"
+            className="flex items-center gap-2 text-[13px] font-bold text-gray-500 hover:text-[#e0b596] transition-colors"
           >
             {showMoreOptions ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             More options
@@ -363,12 +429,12 @@ export function CreateReminder({
                 exit={{ height: 0, opacity: 0 }}
                 className="overflow-hidden space-y-2"
               >
-                <div className="flex items-center gap-2 bg-gray-50 dark:bg-[#252525] p-3.5 rounded-2xl border border-gray-100 dark:border-[#333]">
-                  <Repeat className="w-5 h-5 text-[#e0b596]" />
+                <div className="flex items-center gap-2 bg-gray-50 dark:bg-[#252525] px-3 py-2 rounded-2xl border border-gray-100 dark:border-[#333] shadow-sm">
+                  <Repeat className="w-3.5 h-3.5 text-[#e0b596]" />
                   <select
                     value={repeat}
                     onChange={(e) => setRepeat(e.target.value)}
-                    className="bg-transparent text-sm font-medium focus:outline-none w-full appearance-none cursor-pointer"
+                    className="bg-transparent text-[13px] font-bold focus:outline-none w-full appearance-none cursor-pointer border-none p-0"
                   >
                     <option value="never">Does not repeat</option>
                     <option value="daily">Every day</option>
@@ -376,27 +442,26 @@ export function CreateReminder({
                     <option value="monthly">Every month</option>
                   </select>
                 </div>
-                <div className="flex items-start gap-2 bg-gray-50 dark:bg-[#252525] p-3.5 rounded-2xl border border-gray-100 dark:border-[#333]">
-                  <AlignLeft className="w-5 h-5 text-[#e0b596] mt-0.5" />
+                <div className="flex items-start gap-2 bg-gray-50 dark:bg-[#252525] px-3 py-2 rounded-2xl border border-gray-100 dark:border-[#333] shadow-sm">
+                  <AlignLeft className="w-3.5 h-3.5 text-[#e0b596] mt-1" />
                   <textarea
                     placeholder="Add notes..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="bg-transparent text-sm font-medium focus:outline-none w-full min-h-[80px] resize-none placeholder:text-gray-400 dark:placeholder:text-gray-600"
+                    className="bg-transparent text-[13px] font-bold focus:outline-none w-full min-h-[80px] resize-none placeholder:text-gray-400 dark:placeholder:text-gray-600 border-none p-0"
                   />
                 </div>
-                <div className="flex items-center justify-between gap-2 bg-purple-50/50 dark:bg-purple-900/10 p-3.5 rounded-2xl border border-purple-100 dark:border-purple-800/30">
+                <div className="flex items-center justify-between gap-2 bg-gray-50/50 dark:bg-[#252525] px-3 py-2 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm group hover:border-[#e0b596]/30 transition-all cursor-pointer" onClick={() => setIsSpecial(!isSpecial)}>
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-purple-500" />
-                    <div>
-                      <p className="text-sm font-bold text-purple-700 dark:text-purple-300">Mark as special</p>
-                      <p className="text-[10px] text-purple-600/70 dark:text-purple-400/50 leading-tight">Highlight this task with an icon and unique color</p>
-                    </div>
+                    <Sparkles className={`w-3.5 h-3.5 transition-colors ${isSpecial ? 'text-purple-500' : 'text-gray-400'}`} />
+                    <span className="text-[13px] font-bold">Mark as special</span>
                   </div>
-                  <Switch
+                  <input
+                    type="checkbox"
                     checked={isSpecial}
-                    onCheckedChange={setIsSpecial}
-                    className="data-[state=checked]:bg-purple-500"
+                    onChange={(e) => setIsSpecial(e.target.checked)}
+                    className="w-4 h-4 accent-[#e0b596] cursor-pointer"
+                    onClick={(e) => e.stopPropagation()}
                   />
                 </div>
               </motion.div>
@@ -405,12 +470,12 @@ export function CreateReminder({
         </div>
 
         <div className="pt-2 flex items-center justify-between mt-4">
-          <Button variant="ghost" onClick={onClose} className="text-gray-400 text-sm font-bold hover:text-gray-600 dark:hover:text-white">
+          <Button variant="ghost" onClick={onClose} className="text-gray-400 text-[13px] font-bold hover:text-gray-600 dark:hover:text-white">
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
-            className="bg-[#e0b596] hover:bg-[#d4a37f] text-white text-sm font-bold px-10 py-5 h-auto rounded-2xl shadow-lg transition-all transform hover:scale-105 active:scale-95"
+            className="bg-[#e0b596] hover:bg-[#d4a37f] text-white text-[13px] font-bold px-10 py-5 h-auto rounded-2xl shadow-lg transition-all transform hover:scale-105 active:scale-95"
           >
             Create Task
           </Button>
@@ -431,38 +496,39 @@ export function CreateReminder({
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
-          {tasksForDay.length > 0 ? (
+          {allScheduleItems.length > 0 ? (
             <div className="relative pl-5 border-l-2 border-gray-200 dark:border-[#333] space-y-8">
-              {tasksForDay.map((task) => (
-                <div key={task.id} className="relative">
-                  <div className="absolute -left-[25px] top-1 w-3.5 h-3.5 rounded-full bg-white dark:bg-[#1b1b1b] border-2 border-[#e0b596]" />
-                  <div className="space-y-1">
-                    <span className="text-xs font-bold text-[#e0b596] uppercase tracking-tighter">
-                      {task.time ? format(parse(task.time, 'HH:mm', new Date()), 'h:mm a') : '--'}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <p className={`text-base font-semibold leading-tight text-gray-800 dark:text-gray-200 ${task.completed ? 'line-through opacity-50' : ''}`}>
-                        {task.title}
-                      </p>
-                      {!task.completed && isBefore(parse(`${task.date} ${task.time || '00:00'}`, 'yyyy-MM-dd HH:mm', new Date()), new Date()) && (
-                        <CircleAlert className="w-3.5 h-3.5 text-amber-500/80" />
+              {allScheduleItems.map((item) => (
+                item.isPreview ? (
+                  <div key="preview-now" className="relative">
+                    <div className="absolute -left-[25px] top-[5px] w-3.5 h-3.5 rounded-full bg-[#ef4444] shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
+                    <span className="text-xs font-bold text-red-500 uppercase tracking-tighter">Now</span>
+                  </div>
+                ) : (
+                  <div key={item.id} className="relative">
+                    <div className="absolute -left-[25px] top-1 w-3.5 h-3.5 rounded-full bg-white dark:bg-[#1b1b1b] border-2 border-[#e0b596]" />
+                    <div className="space-y-1">
+                      <span className="text-xs font-bold text-[#e0b596] uppercase tracking-tighter">
+                        {item.time ? format(parse(item.time, 'HH:mm', new Date()), 'h:mm a') : '--'}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <p className={`text-base font-semibold leading-tight text-gray-800 dark:text-gray-200 ${item.completed ? 'line-through opacity-50' : ''}`}>
+                          {item.title}
+                        </p>
+                        {!item.completed && isBefore(parse(`${item.date} ${item.time || '00:00'}`, 'yyyy-MM-dd HH:mm', new Date()), new Date()) && (
+                          <CircleAlert className="w-3.5 h-3.5 text-amber-500/80" />
+                        )}
+                      </div>
+                      {item.location && (
+                        <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                          <MapPin className="w-3 h-3" />
+                          {item.location}
+                        </div>
                       )}
                     </div>
-                    {task.location && (
-                      <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                        <MapPin className="w-3 h-3" />
-                        {task.location}
-                      </div>
-                    )}
                   </div>
-                </div>
+                )
               ))}
-              {isSameDay(parse(startDate, 'yyyy-MM-dd', new Date()), new Date()) && (
-                <div className="relative">
-                  <div className="absolute -left-[25px] top-1 w-3.5 h-3.5 rounded-full bg-[#ef4444] shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
-                  <span className="text-xs font-bold text-red-500 uppercase">Now</span>
-                </div>
-              )}
             </div>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-40">
@@ -473,11 +539,7 @@ export function CreateReminder({
             </div>
           )}
         </div>
-        <div className="p-5 bg-white dark:bg-[#1b1b1b] border-t border-gray-200 dark:border-[#292929]">
-          <p className="text-xs text-gray-400 leading-tight">
-            Reviewing your schedule helps you avoid conflicts and plan your day more effectively.
-          </p>
-        </div>
+
       </div>
 
       <style>{`

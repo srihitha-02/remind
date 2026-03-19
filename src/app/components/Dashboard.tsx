@@ -115,6 +115,9 @@ export function Dashboard({
   const [showSettings, setShowSettings] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  // Live clock — updates every 30s so the red line stays accurate
+  const [currentNow, setCurrentNow] = useState(new Date());
   const [showMiniCalendar, setShowMiniCalendar] = useState(false);
   const [openInEditMode, setOpenInEditMode] = useState(false);
   const [completedSearchDate, setCompletedSearchDate] = useState<Date | undefined>(undefined);
@@ -390,6 +393,27 @@ export function Dashboard({
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 
+  // Auto-scroll to current time (red line) on app load
+  useEffect(() => {
+    const scrollToCurrentTime = () => {
+      if (!containerRef.current) return;
+      const now = new Date();
+      // 1px per minute (HOUR_HEIGHT = 60, so 60px per hour)
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      // Offset upward by ~100px so there's some context above the red line
+      const scrollTarget = Math.max(0, currentMinutes - 100);
+      containerRef.current.scrollTop = scrollTarget;
+    };
+    // Small delay to ensure the DOM is fully rendered
+    const timer = setTimeout(scrollToCurrentTime, 150);
+    return () => clearTimeout(timer);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Tick currentNow every 30s to keep the red line in sync with the clock
+  useEffect(() => {
+    const interval = setInterval(() => setCurrentNow(new Date()), 30_000);
+    return () => clearInterval(interval);
+  }, []);
 
   // --- Event Layout Logic (Overlaps) ---
   const eventsForGrid = useMemo(() => {
@@ -517,7 +541,7 @@ export function Dashboard({
                   setActiveView('calendar');
                   document.getElementById('dashboard-main')?.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className={`group relative p-3 rounded-xl transition-all ${activeView === 'calendar' ? 'bg-gray-100 dark:bg-[#292929] text-[#e0b596]' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#292929]/50'}`}
+                className={`group relative p-3 rounded-xl transition-all ${activeView === 'calendar' ? 'bg-gray-100 dark:bg-[#333] text-[#e0b596]' : 'text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2e2e2e]'}`}
               >
                 <Home className="w-6 h-6" />
               </button>
@@ -529,7 +553,7 @@ export function Dashboard({
             <TooltipTrigger asChild>
               <button 
                 onClick={() => setActiveView('pending')} 
-                className={`group relative p-3 rounded-xl transition-all ${activeView === 'pending' ? 'bg-gray-100 dark:bg-[#292929] text-[#e0b596]' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#292929]/50'}`}
+                className={`group relative p-3 rounded-xl transition-all ${activeView === 'pending' ? 'bg-gray-100 dark:bg-[#333] text-[#e0b596]' : 'text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2e2e2e]'}`}
               >
                 <Hourglass className="w-6 h-6" />
               </button>
@@ -541,7 +565,7 @@ export function Dashboard({
             <TooltipTrigger asChild>
               <button 
                 onClick={() => setActiveView('completed')} 
-                className={`group relative p-3 rounded-xl transition-all ${activeView === 'completed' ? 'bg-gray-100 dark:bg-[#292929] text-[#e0b596]' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#292929]/50'}`}
+                className={`group relative p-3 rounded-xl transition-all ${activeView === 'completed' ? 'bg-gray-100 dark:bg-[#333] text-[#e0b596]' : 'text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2e2e2e]'}`}
               >
                 <Check className="w-6 h-6" />
               </button>
@@ -554,7 +578,7 @@ export function Dashboard({
               <TooltipTrigger asChild>
                 <button 
                   onClick={toggleTheme} 
-                  className="group relative p-3 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#292929]/50 transition-all"
+                  className="group relative p-3 rounded-xl text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2e2e2e] transition-all"
                 >
                   {theme === 'dark' ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
                 </button>
@@ -587,11 +611,17 @@ export function Dashboard({
                   <div className="bg-transparent">
                     <Calendar
                       mode="single"
+                      month={currentMonth}
+                      onMonthChange={(month) => {
+                        setCurrentMonth(month);
+                        setCurrentDate(startOfMonth(month));
+                      }}
                       today={new Date()}
                       selected={currentDate}
                       onSelect={(date) => {
                         if (date) {
                           setCurrentDate(date);
+                          setCurrentMonth(date);
                         }
                       }}
                       className="w-full p-0"
@@ -642,7 +672,7 @@ export function Dashboard({
                     <TooltipTrigger asChild>
                       <button 
                         onClick={() => setShowSecondarySidebar(!showSecondarySidebar)}
-                        className={`hidden xl:flex items-center justify-center p-2 rounded-lg transition-all ${!showSecondarySidebar ? 'bg-[#e0b596]/10 text-[#e0b596]' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-[#292929]'}`}
+                        className={`hidden xl:flex items-center justify-center p-2 rounded-lg transition-all ${!showSecondarySidebar ? 'bg-[#e0b596]/10 text-[#e0b596]' : 'text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#292929]'}`}
                       >
                         <PanelLeft className="w-5 h-5" />
                       </button>
@@ -653,7 +683,7 @@ export function Dashboard({
                   <div className="relative">
                     <button
                       onClick={() => setShowMiniCalendar(!showMiniCalendar)}
-                      className="text-sm font-semibold tracking-tight text-gray-500 dark:text-gray-400 flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-[#292929] px-2 py-1 rounded transition-colors"
+                      className="text-sm font-semibold tracking-tight text-gray-500 dark:text-gray-300 flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-[#292929] px-2 py-1 rounded transition-colors"
                     >
                       {format(currentDate, 'MMMM yyyy')}
                       <ChevronDown className={`w-3 h-3 transition-transform ${showMiniCalendar ? 'rotate-180' : ''}`} />
@@ -663,10 +693,16 @@ export function Dashboard({
                       <div className="absolute top-full left-0 mt-2 p-2 bg-white dark:bg-[#292929] border border-gray-200 dark:border-[#333] rounded-lg shadow-2xl z-50">
                         <DayPicker
                           mode="single"
+                          month={currentMonth}
+                          onMonthChange={(month) => {
+                            setCurrentMonth(month);
+                            setCurrentDate(startOfMonth(month));
+                          }}
                           selected={currentDate}
                           onSelect={(date) => {
                             if (date) {
                               setCurrentDate(date);
+                              setCurrentMonth(date);
                               setShowMiniCalendar(false);
                             }
                           }}
@@ -884,16 +920,16 @@ export function Dashboard({
                           {/* Current Time Indicator */}
                           {isToday(currentDate) && (
                             <div
-                              className="absolute w-full z-10 pointer-events-none flex items-center"
+                              className="absolute w-full z-50 pointer-events-none flex items-center -translate-y-1/2"
                               style={{
                                 top: (new Date().getHours() * 60 + new Date().getMinutes()) + 'px'
                               }}
                             >
-                              <div className="w-[60px] text-right pr-2 text-red-500 text-xs font-bold leading-none">
+                              <div className="w-[60px] text-right pr-2 text-red-500 text-[10px] font-black leading-none bg-white/60 dark:bg-black/40 py-0.5 rounded-sm backdrop-blur-[2px]">
                                 {format(new Date(), 'h:mm a')}
                               </div>
-                              <div className="flex-1 h-[2px] bg-red-500 relative">
-                                <div className="absolute -left-1.5 -top-1.5 w-3 h-3 rounded-full bg-red-500" />
+                              <div className="flex-1 h-[1px] bg-red-500 relative">
+                                <div className="absolute -left-1 -top-1 w-2 h-2 rounded-full bg-red-500" />
                               </div>
                             </div>
                           )}
@@ -1196,13 +1232,17 @@ export function Dashboard({
               )
             )}
 
-            {activeView === 'locations' && <NearbyLocations tasks={sanitizedTasks.filter(t => !t.completed)} />}
+            {activeView === 'locations' && (
+              <div className="flex-1 overflow-y-auto px-8 py-8 custom-scrollbar scroll-smooth">
+                <NearbyLocations tasks={sanitizedTasks.filter(t => !t.completed)} />
+              </div>
+            )}
 
             {(activeView === 'pending' || activeView === 'completed') && (
-              <div className="max-w-4xl mx-auto space-y-6">
+              <div className="flex-1 overflow-y-auto px-8 py-8 space-y-6 custom-scrollbar scroll-smooth">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white capitalize flex items-center gap-3">
-                    {activeView === 'pending' ? <Clock className="w-8 h-8 text-[#e0b596]" /> : <CheckCircle className="w-8 h-8 text-green-500" />}
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white capitalize flex items-center gap-2">
+                    {activeView === 'pending' ? <Clock className="w-6 h-6 text-[#e0b596]" /> : <CheckCircle className="w-6 h-6 text-green-500" />}
                     {activeView} Tasks
                   </h2>
 
@@ -1280,8 +1320,8 @@ export function Dashboard({
                           >
                             <div className="flex items-start gap-4">
                               <button
-                                onClick={() => onToggleComplete(task.id)}
-                                className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${task.completed ? 'bg-green-500 border-green-500' : 'border-gray-400 hover:border-[#e0b596]'}`}
+                                onClick={() => { if (!task.completed) onToggleComplete(task.id); }}
+                                className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${task.completed ? 'bg-green-500 border-green-500 cursor-default' : 'border-gray-400 hover:border-[#e0b596]'}`}
                               >
                                 {task.completed && <CheckCircle className="w-3.5 h-3.5 text-white" />}
                               </button>
