@@ -2,18 +2,18 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/app/components/ui/button';
 import { Badge } from '@/app/components/ui/badge';
-import { 
-  X, 
-  Calendar as CalendarIcon, 
-  Clock, 
-  Tag, 
-  MapPin, 
-  Navigation, 
-  Sparkles, 
-  AlignLeft, 
-  Repeat, 
-  ChevronDown, 
-  ChevronRight, 
+import {
+  X,
+  Calendar as CalendarIcon,
+  Clock,
+  Tag,
+  MapPin,
+  Navigation,
+  Sparkles,
+  AlignLeft,
+  Repeat,
+  ChevronDown,
+  ChevronRight,
   Info,
   CircleAlert
 } from 'lucide-react';
@@ -127,7 +127,7 @@ function TimePicker({ value, onChange, disabled }: TimePickerProps) {
         const h = parseInt(format(currentTime, 'h'));
         const m = parseInt(format(currentTime, 'mm'));
         const p = format(currentTime, 'a');
-        
+
         if (hRef.current) hRef.current.scrollTop = (h - 1) * ITEM_HEIGHT;
         if (mRef.current) mRef.current.scrollTop = m * ITEM_HEIGHT;
         if (pRef.current) pRef.current.scrollTop = (p === 'AM' ? 0 : 1) * ITEM_HEIGHT;
@@ -141,7 +141,7 @@ function TimePicker({ value, onChange, disabled }: TimePickerProps) {
     try {
       const parsed = parse(`${formattedHour}:${formattedMinute} ${p}`, 'h:mm a', new Date());
       onChange(format(parsed, 'HH:mm'));
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleScroll = (type: 'h' | 'm' | 'p') => {
@@ -151,7 +151,7 @@ function TimePicker({ value, onChange, disabled }: TimePickerProps) {
     isScrollingRef.current = true;
     const scrollPos = targetRef.current.scrollTop;
     const index = Math.round(scrollPos / ITEM_HEIGHT);
-    
+
     const currentTime = parse(value, 'HH:mm', new Date());
     const hVal = format(currentTime, 'h');
     const mVal = format(currentTime, 'mm');
@@ -173,7 +173,7 @@ function TimePicker({ value, onChange, disabled }: TimePickerProps) {
         updateTime(hVal, mVal, newP);
       }
     }
-    
+
     setTimeout(() => { isScrollingRef.current = false; }, 200);
   };
 
@@ -206,17 +206,17 @@ function TimePicker({ value, onChange, disabled }: TimePickerProps) {
             <div className="flex items-center justify-center h-28 relative bg-gray-50 dark:bg-black/20 rounded-lg overflow-hidden border border-gray-100 dark:border-white/5">
               {/* Highlight Overlay */}
               <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[28px] bg-[#e0b596]/10 border-y border-[#e0b596]/20 pointer-events-none rounded-sm" />
-              
+
               <div className="flex flex-1 items-center justify-center relative h-full">
                 {/* Hours */}
-                <div 
-                  ref={hRef} 
+                <div
+                  ref={hRef}
                   onScroll={() => handleScroll('h')}
                   className="w-8 h-full overflow-y-auto no-scrollbar snap-y snap-mandatory py-[42px] touch-pan-y"
                 >
                   {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
-                    <div 
-                      key={h} 
+                    <div
+                      key={h}
                       className={`h-[28px] flex items-center justify-center snap-center text-[11px] font-bold transition-all ${hVal === h.toString() ? 'text-[#e0b596]' : 'text-black dark:text-white opacity-40'}`}
                     >
                       {h.toString().padStart(2, '0')}
@@ -227,14 +227,14 @@ function TimePicker({ value, onChange, disabled }: TimePickerProps) {
                 <div className="text-[#e0b596] font-bold opacity-30 select-none text-[10px] px-0.5">:</div>
 
                 {/* Minutes */}
-                <div 
-                  ref={mRef} 
+                <div
+                  ref={mRef}
                   onScroll={() => handleScroll('m')}
                   className="w-8 h-full overflow-y-auto no-scrollbar snap-y snap-mandatory py-[42px] touch-pan-y"
                 >
                   {Array.from({ length: 60 }, (_, i) => i).map(m => (
-                    <div 
-                      key={m} 
+                    <div
+                      key={m}
                       className={`h-[28px] flex items-center justify-center snap-center text-[11px] font-bold transition-all ${mVal === m.toString().padStart(2, '0') ? 'text-[#e0b596]' : 'text-black dark:text-white opacity-40'}`}
                     >
                       {m.toString().padStart(2, '0')}
@@ -245,14 +245,14 @@ function TimePicker({ value, onChange, disabled }: TimePickerProps) {
                 <div className="w-1" />
 
                 {/* AM/PM Scrollable */}
-                <div 
-                  ref={pRef} 
+                <div
+                  ref={pRef}
                   onScroll={() => handleScroll('p')}
                   className="w-8 h-full overflow-y-auto no-scrollbar snap-y snap-mandatory py-[42px] touch-pan-y"
                 >
                   {['AM', 'PM'].map(p => (
-                    <div 
-                      key={p} 
+                    <div
+                      key={p}
                       className={`h-[28px] flex items-center justify-center snap-center text-[9px] font-black transition-all ${pVal === p ? 'text-[#e0b596]' : 'text-black dark:text-white opacity-40'}`}
                     >
                       {p}
@@ -261,10 +261,10 @@ function TimePicker({ value, onChange, disabled }: TimePickerProps) {
                 </div>
               </div>
             </div>
-            
-            <Button 
-                onClick={() => setShow(false)} 
-                className="w-full h-7 bg-[#e0b596] hover:bg-[#d4a37f] text-white text-[10px] font-bold rounded-lg shadow-sm active:scale-95 transition-all"
+
+            <Button
+              onClick={() => setShow(false)}
+              className="w-full h-7 bg-[#e0b596] hover:bg-[#d4a37f] text-white text-[10px] font-bold rounded-lg shadow-sm active:scale-95 transition-all"
             >
               Set Time
             </Button>
@@ -306,6 +306,7 @@ export function TaskDetails({
   const [description, setDescription] = useState(task.description ? task.description.replace(/<!-- metadata: .+ -->/, '').trim() : '');
   const [repeat, setRepeat] = useState(parsedMetadata?.repeat || 'never');
   const [isSpecial, setIsSpecial] = useState(parsedMetadata?.isSpecial || false);
+  const [notifyBefore, setNotifyBefore] = useState(task.notifyBefore || 5);
   const [showMoreOptions, setShowMoreOptions] = useState(false);
 
   // Refined useEffect to only reset state when switching to edit mode or changing tasks
@@ -320,6 +321,7 @@ export function TaskDetails({
       setDescription(task.description ? task.description.replace(/<!-- metadata: .+ -->/, '').trim() : '');
       setRepeat(parsedMetadata?.repeat || 'never');
       setIsSpecial(parsedMetadata?.isSpecial || false);
+      setNotifyBefore(task.notifyBefore || 5);
     }
     // We only want to re-run this when the task itself changes or we START editing
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -441,6 +443,22 @@ export function TaskDetails({
                         <option value="monthly">Every month</option>
                       </select>
                     </div>
+                    <div className="flex items-center gap-2 bg-gray-50 dark:bg-[#252525] px-3 py-2 rounded-2xl border border-gray-100 dark:border-[#333] shadow-sm">
+                      <Clock className="w-3.5 h-3.5 text-[#e0b596]" />
+                      <select
+                        value={notifyBefore}
+                        onChange={(e) => setNotifyBefore(parseInt(e.target.value))}
+                        className="bg-transparent text-[13px] font-bold focus:outline-none w-full appearance-none cursor-pointer border-none p-0"
+                      >
+                        <option value={0}>No reminder</option>
+                        <option value={5}>5 minutes before</option>
+                        <option value={10}>10 minutes before</option>
+                        <option value={15}>15 minutes before</option>
+                        <option value={30}>30 minutes before</option>
+                        <option value={60}>1 hour before</option>
+                        <option value={1440}>1 day before</option>
+                      </select>
+                    </div>
                     <div className="flex items-start gap-2 bg-gray-50 dark:bg-[#252525] px-3 py-2 rounded-2xl border border-gray-100 dark:border-[#333] shadow-sm">
                       <AlignLeft className="w-3.5 h-3.5 text-[#e0b596] mt-1" />
                       <textarea
@@ -555,17 +573,17 @@ export function TaskDetails({
                     onClick={() => {
                       const start = parse(`${startDate} ${startTime}`, 'yyyy-MM-dd HH:mm', new Date());
                       const end = parse(`${endDate} ${endTime}`, 'yyyy-MM-dd HH:mm', new Date());
-                      
-                        const now = new Date();
-                        if (isBefore(start, subMinutes(now, 1))) {
-                          toast.error('Cannot create tasks in the past');
-                          return;
-                        }
+
+                      const now = new Date();
+                      if (isBefore(start, subMinutes(now, 1))) {
+                        toast.error('Cannot create tasks in the past');
+                        return;
+                      }
 
                       const finalDuration = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60));
                       const metaData = JSON.stringify({ location, duration: finalDuration, repeat, endDate, endTime, isSpecial });
                       const finalDescription = description.trim() ? `${description.trim()}\n\n<!-- metadata: ${metaData} -->` : `<!-- metadata: ${metaData} -->`;
-                       onUpdateTask({
+                      onUpdateTask({
                         ...task,
                         title,
                         description: finalDescription,
@@ -573,7 +591,8 @@ export function TaskDetails({
                         time: startTime,
                         location,
                         duration: finalDuration,
-                        isSpecial
+                        isSpecial,
+                        notifyBefore
                       });
                       toast.success('Changes saved');
                       setIsEditing(false);
@@ -587,16 +606,16 @@ export function TaskDetails({
               </>
             ) : (
               <>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   onClick={() => { onDeleteTask(task.id); onClose(); }}
                   className="text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 text-sm font-bold h-auto py-4 px-4 rounded-xl"
                 >
                   Delete
                 </Button>
                 <div className="flex items-center gap-3">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => { if (!task.completed) { onToggleComplete(task.id); onClose(); } }}
                     className={`text-sm font-bold border-2 rounded-2xl h-auto py-4 px-6 transition-all ${task.completed ? 'text-green-500 border-green-500 cursor-default bg-green-50/50' : 'text-gray-400 border-gray-200 hover:border-[#e0b596]'}`}
                   >
@@ -638,9 +657,8 @@ export function TaskDetails({
                         {t.time ? format(parse(t.time, 'HH:mm', new Date()), 'h:mm a') : '--'}
                       </span>
                       <div className="flex items-center gap-1.5">
-                        <p className={`text-base font-semibold leading-tight ${
-                          t.id === task.id ? 'text-gray-900 dark:text-white font-bold' : 'text-gray-600 dark:text-gray-400'
-                        } ${t.completed ? 'line-through opacity-50' : ''}`}>
+                        <p className={`text-base font-semibold leading-tight ${t.id === task.id ? 'text-gray-900 dark:text-white font-bold' : 'text-gray-600 dark:text-gray-400'
+                          } ${t.completed ? 'line-through opacity-50' : ''}`}>
                           {t.title}
                         </p>
                         {!t.completed && isBefore(parse(`${t.date} ${t.time || '00:00'}`, 'yyyy-MM-dd HH:mm', new Date()), new Date()) && (

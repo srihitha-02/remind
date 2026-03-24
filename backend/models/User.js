@@ -44,6 +44,14 @@ const User = sequelize.define('User', {
         type: DataTypes.DATE,
         allowNull: true,
     },
+    pushSubscription: {
+        type: DataTypes.JSON,
+        allowNull: true,
+    },
+    notificationsEnabled: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
+    },
 }, {
     tableName: 'users',
     timestamps: true,

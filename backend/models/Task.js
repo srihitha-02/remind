@@ -63,6 +63,14 @@ const Task = sequelize.define('Task', {
         type: DataTypes.BOOLEAN,
         defaultValue: false,
     },
+    notifiedTime: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+    },
+    notifiedBefore: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+    },
 }, {
     tableName: 'tasks',
     timestamps: true,

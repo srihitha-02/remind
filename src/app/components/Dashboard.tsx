@@ -58,7 +58,9 @@ import {
   LayoutGrid,
   Rows3,
   Columns3,
-  PanelLeft
+  PanelLeft,
+  Bell,
+  BellOff
 } from 'lucide-react';
 
 import { Task } from '@/app/types';
@@ -87,6 +89,8 @@ interface DashboardProps {
   onToggleComplete: (id: string) => void;
   onUpdateTask: (task: Task) => void;
   onUpdateUser: (newName: string) => void;
+  notificationsEnabled: boolean;
+  onToggleNotifications: () => void;
 }
 
 type View = 'locations' | 'settings' | 'pending' | 'completed' | 'calendar';
@@ -107,6 +111,8 @@ export function Dashboard({
   onToggleComplete,
   onUpdateTask,
   onUpdateUser,
+  notificationsEnabled,
+  onToggleNotifications,
 }: DashboardProps) {
   const [activeView, setActiveView] = useState<View>('calendar');
   const isMobile = useIsMobile();
@@ -162,7 +168,7 @@ export function Dashboard({
         try {
           const meta = JSON.parse(match[1]);
           if (meta.isSpecial) return { ...t, isSpecial: true };
-        } catch (e) {}
+        } catch (e) { }
       }
       return t;
     });
@@ -219,7 +225,7 @@ export function Dashboard({
     // Validate past time (with 1 min buffer)
     const clickedDate = addDays(startDate, dayIndex);
     const clickedDateTime = setMinutes(setHours(startOfDay(clickedDate), Math.floor(time / 60)), time % 60);
-    
+
     if (isBefore(clickedDateTime, subMinutes(new Date(), 1))) {
       toast.error('Cannot create tasks in the past');
       return;
@@ -317,11 +323,11 @@ export function Dashboard({
           setDragMode('none');
           return;
         } else if (!isToday(newDate) && isBefore(newDate, startOfDay(now))) {
-           // Prevent moving to entirely past days as well
-           toast.error('Cannot move tasks to the past');
-           setActiveTaskId(null);
-           setDragMode('none');
-           return;
+          // Prevent moving to entirely past days as well
+          toast.error('Cannot move tasks to the past');
+          setActiveTaskId(null);
+          setDragMode('none');
+          return;
         }
 
         onUpdateTask({ ...task, date: newDateStr, time: newTimeStr });
@@ -357,7 +363,7 @@ export function Dashboard({
     setDragStart(null);
     setDragCurrent(null);
     setActiveTaskId(null);
-    
+
     // Clear wasDragging after a short delay to allow the click event to fire and be ignored
     setTimeout(() => {
       wasDragging.current = false;
@@ -551,8 +557,8 @@ export function Dashboard({
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <button 
-                onClick={() => setActiveView('pending')} 
+              <button
+                onClick={() => setActiveView('pending')}
                 className={`group relative p-3 rounded-xl transition-all ${activeView === 'pending' ? 'bg-gray-100 dark:bg-[#333] text-[#e0b596]' : 'text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2e2e2e]'}`}
               >
                 <Hourglass className="w-6 h-6" />
@@ -563,8 +569,8 @@ export function Dashboard({
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <button 
-                onClick={() => setActiveView('completed')} 
+              <button
+                onClick={() => setActiveView('completed')}
                 className={`group relative p-3 rounded-xl transition-all ${activeView === 'completed' ? 'bg-gray-100 dark:bg-[#333] text-[#e0b596]' : 'text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2e2e2e]'}`}
               >
                 <Check className="w-6 h-6" />
@@ -576,8 +582,8 @@ export function Dashboard({
           <div className="mt-auto flex flex-col items-center gap-4 mb-4">
             <Tooltip>
               <TooltipTrigger asChild>
-                <button 
-                  onClick={toggleTheme} 
+                <button
+                  onClick={toggleTheme}
                   className="group relative p-3 rounded-xl text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2e2e2e] transition-all"
                 >
                   {theme === 'dark' ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
@@ -596,7 +602,7 @@ export function Dashboard({
       {/* Secondary Sidebar - Mini Calendar */}
       <AnimatePresence mode="wait">
         {showSecondarySidebar && (
-          <motion.div 
+          <motion.div
             initial={{ width: 0, opacity: 0 }}
             animate={{ width: 280, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
@@ -606,7 +612,7 @@ export function Dashboard({
             <div className="w-[280px] h-full flex flex-col overflow-y-auto scrollbar-none">
               <div className="p-6">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 px-1">Calendar</h2>
-                
+
                 <div className="flex flex-col gap-4">
                   <div className="bg-transparent">
                     <Calendar
@@ -670,7 +676,7 @@ export function Dashboard({
                 <div className={`flex items-center gap-4 ${activeView !== 'calendar' ? 'opacity-0 pointer-events-none' : ''}`}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <button 
+                      <button
                         onClick={() => setShowSecondarySidebar(!showSecondarySidebar)}
                         className={`hidden xl:flex items-center justify-center p-2 rounded-lg transition-all ${!showSecondarySidebar ? 'bg-[#e0b596]/10 text-[#e0b596]' : 'text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#292929]'}`}
                       >
@@ -727,113 +733,110 @@ export function Dashboard({
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="relative">
-                    <button
-                      onClick={() => {
-                        setShowFilters(!showFilters);
-                        if (!showFilters) setShowViewOptions(false);
-                      }}
-                      className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-semibold transition-all group ${
-                        showFilters || showSpecialsOnly 
-                        ? 'bg-[#e0b596]/10 border-[#e0b596] text-[#e0b596]' 
-                        : 'bg-white dark:bg-[#292929] border-gray-200 dark:border-[#333] hover:bg-gray-50 dark:hover:bg-[#333]'
-                      }`}
-                    >
-                      <SlidersHorizontal className="w-4 h-4" />
-                      <span>Filters</span>
-                      {showSpecialsOnly && <div className="w-1.5 h-1.5 rounded-full bg-[#e0b596]" />}
-                    </button>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setShowFilters(!showFilters);
+                    if (!showFilters) setShowViewOptions(false);
+                  }}
+                  className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-semibold transition-all group ${showFilters || showSpecialsOnly
+                    ? 'bg-[#e0b596]/10 border-[#e0b596] text-[#e0b596]'
+                    : 'bg-white dark:bg-[#292929] border-gray-200 dark:border-[#333] hover:bg-gray-50 dark:hover:bg-[#333]'
+                    }`}
+                >
+                  <SlidersHorizontal className="w-4 h-4" />
+                  <span>Filters</span>
+                  {showSpecialsOnly && <div className="w-1.5 h-1.5 rounded-full bg-[#e0b596]" />}
+                </button>
 
-                    <AnimatePresence>
-                      {showFilters && (
-                        <>
-                          <div className="fixed inset-0 z-40" onClick={() => setShowFilters(false)} />
-                          <motion.div
-                            initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                            className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#292929] border border-gray-200 dark:border-[#333] rounded-xl shadow-2xl z-50 p-2 space-y-3"
-                          >
-                            <div className="px-2 py-1">
-                                <div className="flex items-center justify-between mb-2">
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ">View Mode</p>
-                                  {showViewOptions && (
-                                    <button 
-                                      onClick={() => setShowViewOptions(false)}
-                                      className="text-[10px] font-bold text-[#e0b596] hover:underline"
-                                    >
-                                      Collapse
-                                    </button>
-                                  )}
-                                </div>
-                                <div className="grid grid-cols-1 gap-1">
-                                    {!showViewOptions ? (
-                                      <button
-                                        onClick={() => setShowViewOptions(true)}
-                                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-[#e0b596]/10 text-[#e0b596] border border-[#e0b596]/20"
-                                      >
-                                        <currentViewData.icon className="w-4 h-4" />
-                                        <span className="flex-1 text-left">{currentViewData.label}</span>
-                                        <ChevronDown className="w-3 h-3 opacity-50 transition-transform" />
-                                      </button>
-                                    ) : (
-                                      viewOptions.map((option) => (
-                                        <button
-                                          key={option.id}
-                                          onClick={() => {
-                                            setCalendarView(option.id);
-                                            setShowViewOptions(false);
-                                            setShowFilters(false);
-                                          }}
-                                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${calendarView === option.id
-                                            ? 'bg-[#e0b596]/10 text-[#e0b596]'
-                                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#333]'
-                                            }`}
-                                        >
-                                          <option.icon className="w-4 h-4" />
-                                          <span className="flex-1 text-left">{option.label}</span>
-                                          {calendarView === option.id && <Check className="w-3.5 h-3.5" />}
-                                        </button>
-                                      ))
-                                    )}
-                                </div>
+                <AnimatePresence>
+                  {showFilters && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowFilters(false)} />
+                      <motion.div
+                        initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                        className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#292929] border border-gray-200 dark:border-[#333] rounded-xl shadow-2xl z-50 p-2 space-y-3"
+                      >
+                        <div className="px-2 py-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ">View Mode</p>
+                            {showViewOptions && (
+                              <button
+                                onClick={() => setShowViewOptions(false)}
+                                className="text-[10px] font-bold text-[#e0b596] hover:underline"
+                              >
+                                Collapse
+                              </button>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-1 gap-1">
+                            {!showViewOptions ? (
+                              <button
+                                onClick={() => setShowViewOptions(true)}
+                                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-[#e0b596]/10 text-[#e0b596] border border-[#e0b596]/20"
+                              >
+                                <currentViewData.icon className="w-4 h-4" />
+                                <span className="flex-1 text-left">{currentViewData.label}</span>
+                                <ChevronDown className="w-3 h-3 opacity-50 transition-transform" />
+                              </button>
+                            ) : (
+                              viewOptions.map((option) => (
+                                <button
+                                  key={option.id}
+                                  onClick={() => {
+                                    setCalendarView(option.id);
+                                    setShowViewOptions(false);
+                                    setShowFilters(false);
+                                  }}
+                                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${calendarView === option.id
+                                    ? 'bg-[#e0b596]/10 text-[#e0b596]'
+                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#333]'
+                                    }`}
+                                >
+                                  <option.icon className="w-4 h-4" />
+                                  <span className="flex-1 text-left">{option.label}</span>
+                                  {calendarView === option.id && <Check className="w-3.5 h-3.5" />}
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="h-px bg-gray-100 dark:bg-[#333] mx-1" />
+
+                        <div className="px-2 py-1">
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Filters</p>
+                          <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-[#232323] rounded-lg border border-gray-100 dark:border-[#333]">
+                            <div className="flex items-center gap-2">
+                              <Sparkles className="w-4 h-4 text-purple-500" />
+                              <span className="text-sm font-medium">Specials</span>
                             </div>
+                            <Switch
+                              checked={showSpecialsOnly}
+                              onCheckedChange={(val) => {
+                                setShowSpecialsOnly(val);
+                                setShowFilters(false);
+                              }}
+                              className="scale-75 data-[state=checked]:bg-[#e0b596]"
+                            />
+                          </div>
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
 
-                            <div className="h-px bg-gray-100 dark:bg-[#333] mx-1" />
-
-                            <div className="px-2 py-1">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Filters</p>
-                                <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-[#232323] rounded-lg border border-gray-100 dark:border-[#333]">
-                                    <div className="flex items-center gap-2">
-                                        <Sparkles className="w-4 h-4 text-purple-500" />
-                                        <span className="text-sm font-medium">Specials</span>
-                                    </div>
-                                    <Switch 
-                                        checked={showSpecialsOnly} 
-                                        onCheckedChange={(val) => {
-                                            setShowSpecialsOnly(val);
-                                            setShowFilters(false);
-                                        }} 
-                                        className="scale-75 data-[state=checked]:bg-[#e0b596]"
-                                    />
-                                </div>
-                            </div>
-                          </motion.div>
-                        </>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
-                  <button
-                    className="flex items-center gap-2 px-4 py-1.5 bg-gradient-to-b from-[#e0b596]/90 to-[#c69472]/90 text-[#1f1f1f] shadow-[0_10px_20px_rgba(224,181,150,0.4),inset_0_1px_0_rgba(255,255,255,0.6)] border border-white/20 border-t-white/60 hover:brightness-110 hover:scale-[1.05] backdrop-blur-xl transition-all duration-300 rounded-xl text-sm font-semibold"
-                    onClick={() => setCreateModal({ isOpen: true, duration: 30 })}
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Add reminder</span>
-                  </button>
-                </div>
+              <button
+                className="flex items-center gap-2 px-4 py-1.5 bg-gradient-to-b from-[#e0b596]/90 to-[#c69472]/90 text-[#1f1f1f] shadow-[0_10px_20px_rgba(224,181,150,0.4),inset_0_1px_0_rgba(255,255,255,0.6)] border border-white/20 border-t-white/60 hover:brightness-110 hover:scale-[1.05] backdrop-blur-xl transition-all duration-300 rounded-xl text-sm font-semibold"
+                onClick={() => setCreateModal({ isOpen: true, duration: 30 })}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add reminder</span>
+              </button>
 
               <button
                 onClick={() => setShowProfileMenu(true)}
@@ -900,7 +903,7 @@ export function Dashboard({
 
                   {/* Calendar Grid Body */}
                   {calendarView !== 'month' ? (
-                    <div 
+                    <div
                       className="flex-1 overflow-y-auto relative custom-scrollbar"
                       ref={containerRef}
                       onMouseDown={handleMouseDown}
@@ -1388,7 +1391,7 @@ export function Dashboard({
                       </p>
                     </div>
                   </div>
-                  <button 
+                  <button
                     onClick={() => setShowSpecialsOnly(false)}
                     className="p-2 hover:bg-gray-100 dark:hover:bg-[#333] rounded-full transition-colors text-gray-400"
                   >
@@ -1402,7 +1405,7 @@ export function Dashboard({
                       .filter(t => isSameDay(parseISO(t.date), currentDate) && t.isSpecial)
                       .sort((a, b) => (a.time || '').localeCompare(b.time || ''))
                       .map(task => (
-                        <div 
+                        <div
                           key={task.id}
                           onClick={() => setSelectedTask(task)}
                           className="p-4 rounded-2xl bg-white dark:bg-[#252525] border border-gray-100 dark:border-[#333] shadow-sm hover:shadow-md hover:border-purple-200 dark:hover:border-purple-900/50 transition-all cursor-pointer group relative overflow-hidden"
@@ -1446,133 +1449,134 @@ export function Dashboard({
           </AnimatePresence>
         </div>
 
-      {/* Render Modals */}
-      <AnimatePresence>
-        {/* Mobile Sidebar Overlay */}
-        {
-          showSidebar && (
-            <>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setShowSidebar(false)}
-                className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
-              />
-              <motion.div
-                initial={{ x: "-100%" }}
-                animate={{ x: 0 }}
-                exit={{ x: "-100%" }}
-                transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                className="fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-[#1b1b1b] shadow-2xl p-6 lg:hidden flex flex-col border-r border-gray-200 dark:border-[#292929]"
-              >
-                <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Menu</h2>
-                  <button
-                    onClick={() => setShowSidebar(false)}
-                    className="p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-[#292929] rounded-lg transition-colors"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
-
-                <nav className="flex flex-col gap-2 space-y-1">
-                  <button
-                    onClick={() => { setActiveView('calendar'); setShowSidebar(false); }}
-                    className={`flex items-center gap-4 p-3 rounded-xl transition-all ${activeView === 'calendar' ? 'bg-gray-100 dark:bg-[#292929] text-[#e0b596] font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#292929]/50'}`}
-                  >
-                    <Home className="w-5 h-5" />
-                    <span>Home</span>
-                  </button>
-
-
-
-                  <button
-                    onClick={() => { setActiveView('pending'); setShowSidebar(false); }}
-                    className={`flex items-center gap-4 p-3 rounded-xl transition-all ${activeView === 'pending' ? 'bg-gray-100 dark:bg-[#292929] text-[#e0b596] font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#292929]/50'}`}
-                  >
-                    <Hourglass className="w-5 h-5" />
-                    <span>Pending Tasks</span>
-                  </button>
-
-                  <button
-                    onClick={() => { setActiveView('completed'); setShowSidebar(false); }}
-                    className={`flex items-center gap-4 p-3 rounded-xl transition-all ${activeView === 'completed' ? 'bg-gray-100 dark:bg-[#292929] text-[#e0b596] font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#292929]/50'}`}
-                  >
-                    <Check className="w-5 h-5" />
-                    <span>Completed</span>
-                  </button>
-                </nav>
-
-                <div className="mt-auto border-t border-gray-100 dark:border-[#292929] pt-6 space-y-2">
-                  <button
-                    onClick={() => { toggleTheme(); }}
-                    className="w-full flex items-center gap-4 p-3 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#292929]/50 transition-all"
-                  >
-                    {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                    <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
-                  </button>
-
-                  <button
-                    onClick={() => { setShowSettings(true); setShowSidebar(false); }}
-                    className="w-full flex items-center gap-4 p-3 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#292929]/50 transition-all"
-                  >
-                    <Settings className="w-5 h-5" />
-                    <span>Settings</span>
-                  </button>
-                </div>
-              </motion.div>
-            </>
-          )
-        }
-        {
-          createModal.isOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-              <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-2xl h-[85vh] flex flex-col">
-                <CreateReminder
-                  tasks={sanitizedTasks}
-                  onCreateTask={(t) => {
-                    onAddTask(t);
-                    setCreateModal({ isOpen: false });
-                  }}
-                  initialDate={createModal.date}
-                  initialTime={createModal.time}
-                  initialDuration={createModal.duration}
-                  onClose={() => setCreateModal({ isOpen: false })}
+        {/* Render Modals */}
+        <AnimatePresence>
+          {/* Mobile Sidebar Overlay */}
+          {
+            showSidebar && (
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowSidebar(false)}
+                  className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
                 />
-              </motion.div>
-            </div>
-          )
-        }
+                <motion.div
+                  initial={{ x: "-100%" }}
+                  animate={{ x: 0 }}
+                  exit={{ x: "-100%" }}
+                  transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                  className="fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-[#1b1b1b] shadow-2xl p-6 lg:hidden flex flex-col border-r border-gray-200 dark:border-[#292929]"
+                >
+                  <div className="flex items-center justify-between mb-8">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Menu</h2>
+                    <button
+                      onClick={() => setShowSidebar(false)}
+                      className="p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-[#292929] rounded-lg transition-colors"
+                    >
+                      <X className="w-6 h-6" />
+                    </button>
+                  </div>
 
-        {
-          selectedTask && (
-            <TaskDetails
-              task={selectedTask}
-              tasks={sanitizedTasks}
-              initialEditMode={openInEditMode}
-              onClose={() => { setSelectedTask(null); setOpenInEditMode(false); }}
-              // Pass handlers...
-              onToggleComplete={onToggleComplete}
-              onDeleteTask={onDeleteTask}
-              onUpdateTask={onUpdateTask}
-            />
-          )
-        }
+                  <nav className="flex flex-col gap-2 space-y-1">
+                    <button
+                      onClick={() => { setActiveView('calendar'); setShowSidebar(false); }}
+                      className={`flex items-center gap-4 p-3 rounded-xl transition-all ${activeView === 'calendar' ? 'bg-gray-100 dark:bg-[#292929] text-[#e0b596] font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#292929]/50'}`}
+                    >
+                      <Home className="w-5 h-5" />
+                      <span>Home</span>
+                    </button>
 
-        {
-          showSettings && (
-            <SettingsPanel
-              userEmail={userEmail}
-              initialName={userName}
-              onClose={() => setShowSettings(false)}
-              onNotificationChange={() => { }}
-              onUpdateUser={onUpdateUser}
-            />
-          )
-        }
-      </AnimatePresence>
-    </div>
-  </div>
-);
+
+
+                    <button
+                      onClick={() => { setActiveView('pending'); setShowSidebar(false); }}
+                      className={`flex items-center gap-4 p-3 rounded-xl transition-all ${activeView === 'pending' ? 'bg-gray-100 dark:bg-[#292929] text-[#e0b596] font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#292929]/50'}`}
+                    >
+                      <Hourglass className="w-5 h-5" />
+                      <span>Pending Tasks</span>
+                    </button>
+
+                    <button
+                      onClick={() => { setActiveView('completed'); setShowSidebar(false); }}
+                      className={`flex items-center gap-4 p-3 rounded-xl transition-all ${activeView === 'completed' ? 'bg-gray-100 dark:bg-[#292929] text-[#e0b596] font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#292929]/50'}`}
+                    >
+                      <Check className="w-5 h-5" />
+                      <span>Completed</span>
+                    </button>
+                  </nav>
+
+                  <div className="mt-auto border-t border-gray-100 dark:border-[#292929] pt-6 space-y-2">
+                    <button
+                      onClick={() => { toggleTheme(); }}
+                      className="w-full flex items-center gap-4 p-3 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#292929]/50 transition-all"
+                    >
+                      {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                      <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => { setShowSettings(true); setShowSidebar(false); }}
+                      className="w-full flex items-center gap-4 p-3 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#292929]/50 transition-all"
+                    >
+                      <Settings className="w-5 h-5" />
+                      <span>Settings</span>
+                    </button>
+                  </div>
+                </motion.div>
+              </>
+            )
+          }
+          {
+            createModal.isOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-2xl h-[85vh] flex flex-col">
+                  <CreateReminder
+                    tasks={sanitizedTasks}
+                    onCreateTask={(t) => {
+                      onAddTask(t);
+                      setCreateModal({ isOpen: false });
+                    }}
+                    initialDate={createModal.date}
+                    initialTime={createModal.time}
+                    initialDuration={createModal.duration}
+                    onClose={() => setCreateModal({ isOpen: false })}
+                  />
+                </motion.div>
+              </div>
+            )
+          }
+
+          {
+            selectedTask && (
+              <TaskDetails
+                task={selectedTask}
+                tasks={sanitizedTasks}
+                initialEditMode={openInEditMode}
+                onClose={() => { setSelectedTask(null); setOpenInEditMode(false); }}
+                // Pass handlers...
+                onToggleComplete={onToggleComplete}
+                onDeleteTask={onDeleteTask}
+                onUpdateTask={onUpdateTask}
+              />
+            )
+          }
+
+          {
+            showSettings && (
+              <SettingsPanel
+                userEmail={userEmail}
+                initialName={userName}
+                notificationsEnabled={notificationsEnabled}
+                onNotificationChange={onToggleNotifications}
+                onClose={() => setShowSettings(false)}
+                onUpdateUser={onUpdateUser}
+              />
+            )
+          }
+        </AnimatePresence>
+      </div >
+    </div >
+  );
 }

@@ -340,4 +340,48 @@ router.put('/update-name', auth, async (req, res) => {
     }
 });
 
+// @route   POST api/auth/save-subscription
+// @desc    Save push subscription for user
+// @access  Private
+router.post('/save-subscription', auth, async (req, res) => {
+    const { subscription } = req.body;
+
+    try {
+        let user = await User.findByPk(req.user.id);
+        if (!user) {
+            return res.status(404).json({ msg: 'User not found' });
+        }
+
+        user.pushSubscription = subscription;
+        await user.save();
+
+        res.json({ msg: 'Subscription saved successfully' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+// @route   PUT api/auth/update-notifications
+// @desc    Toggle notifications for user
+// @access  Private
+router.put('/update-notifications', auth, async (req, res) => {
+    const { enabled } = req.body;
+
+    try {
+        let user = await User.findByPk(req.user.id);
+        if (!user) {
+            return res.status(404).json({ msg: 'User not found' });
+        }
+
+        user.notificationsEnabled = enabled;
+        await user.save();
+
+        res.json({ msg: 'Notification settings updated', enabled: user.notificationsEnabled });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+});
+
 module.exports = router;

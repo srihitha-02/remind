@@ -20,10 +20,14 @@ app.get('/', (req, res) => {
     res.send('API is running...');
 });
 
+// Start notification scheduler
+const { startNotificationScheduler } = require('./services/notificationService');
+
 // Sync database and start server
 sequelize.sync({ alter: true })
     .then(() => {
         console.log('PostgreSQL connected and tables synced');
+        startNotificationScheduler();
         app.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);
         });

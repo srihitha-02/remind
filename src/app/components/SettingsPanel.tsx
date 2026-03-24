@@ -11,7 +11,8 @@ interface SettingsPanelProps {
   userEmail: string;
   initialName: string;
   onClose: () => void;
-  onNotificationChange: (value: boolean) => void;
+  notificationsEnabled: boolean;
+  onNotificationChange: () => void;
   onUpdateUser: (newName: string) => void;
 }
 
@@ -19,14 +20,12 @@ export function SettingsPanel({
   userEmail,
   initialName,
   onClose,
+  notificationsEnabled,
   onNotificationChange,
   onUpdateUser,
 }: SettingsPanelProps) {
 
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
-    return localStorage.getItem('notifications') !== 'false';
-  });
 
   useEffect(() => {
     const storedTheme = localStorage.getItem('theme');
@@ -59,15 +58,7 @@ export function SettingsPanel({
 
 
   const toggleNotifications = () => {
-    const newValue = !notificationsEnabled;
-    setNotificationsEnabled(newValue);
-    localStorage.setItem('notifications', String(newValue));
-
-    onNotificationChange(newValue); // 🔥 THIS IS THE KEY LINE
-
-    toast.success(
-      newValue ? 'Notifications enabled' : 'Notifications disabled'
-    );
+    onNotificationChange();
   };
 
   const handleUpdateName = async () => {

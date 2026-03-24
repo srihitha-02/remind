@@ -74,11 +74,41 @@ router.put('/:id', auth, async (req, res) => {
             return res.status(401).json({ msg: 'Not authorized' });
         }
 
-        // Update fields
+        // Check if date is changing - if so, create a new task instead of updating
+        if (date !== undefined && date !== task.date) {
+            const newTask = await Task.create({
+                userId: req.user.id,
+                title: title !== undefined ? title : task.title,
+                description: description !== undefined ? description : task.description,
+                category: category !== undefined ? category : task.category,
+                date: date,
+                time: time !== undefined ? time : task.time,
+                duration: duration !== undefined ? duration : task.duration,
+                location: location !== undefined ? location : task.location,
+                isAllDay: isAllDay !== undefined ? isAllDay : task.isAllDay,
+                isSpecial: isSpecial !== undefined ? isSpecial : task.isSpecial,
+                specialType: specialType !== undefined ? specialType : task.specialType,
+                notifyAt: notifyAt !== undefined ? notifyAt : task.notifyAt,
+                notifyBefore: notifyBefore !== undefined ? notifyBefore : task.notifyBefore,
+                completed: false, // New task should be fresh
+            });
+
+            await ActivityLog.create({
+                userId: req.user.id,
+                action: 'TASK_DUPLICATED',
+                details: { originalTaskId: task.id, newTaskId: newTask.id, title: newTask.title },
+                ipAddress: req.ip
+            });
+
+            return res.json(newTask);
+        }
+
+        // Update fields (normal update on same date)
         if (title !== undefined) task.title = title;
         if (description !== undefined) task.description = description;
         if (category !== undefined) task.category = category;
-        if (date !== undefined) task.date = date;
+        // date update is handled above by duplication, so we don't need to update it here
+        // but for safety if it reaches here it means date was undefined or same
         if (time !== undefined) task.time = time;
         if (duration !== undefined) task.duration = duration;
         if (location !== undefined) task.location = location;
