@@ -128,6 +128,8 @@ export function Dashboard({
   const [openInEditMode, setOpenInEditMode] = useState(false);
   const [completedSearchDate, setCompletedSearchDate] = useState<Date | undefined>(undefined);
   const [showCompletedCalendar, setShowCompletedCalendar] = useState(false);
+  const [pendingSearchDate, setPendingSearchDate] = useState<Date | undefined>(undefined);
+  const [showPendingCalendar, setShowPendingCalendar] = useState(false);
   const [showViewDropdown, setShowViewDropdown] = useState(false);
   const [showSecondarySidebar, setShowSecondarySidebar] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
@@ -628,6 +630,8 @@ export function Dashboard({
                         if (date) {
                           setCurrentDate(date);
                           setCurrentMonth(date);
+                          setPendingSearchDate(date);
+                          setCompletedSearchDate(date);
                         }
                       }}
                       className="w-full p-0"
@@ -709,6 +713,8 @@ export function Dashboard({
                             if (date) {
                               setCurrentDate(date);
                               setCurrentMonth(date);
+                              setPendingSearchDate(date);
+                              setCompletedSearchDate(date);
                               setShowMiniCalendar(false);
                             }
                           }}
@@ -1148,7 +1154,11 @@ export function Dashboard({
                       {weekDays.map((day, i) => (
                         <button
                           key={i}
-                          onClick={() => setCurrentDate(day)}
+                          onClick={() => {
+                            setCurrentDate(day);
+                            setPendingSearchDate(day);
+                            setCompletedSearchDate(day);
+                          }}
                           className={`flex flex-col items-center min-w-[40px] gap-1 transition-all ${isSameDay(day, currentDate) ? 'scale-110' : 'opacity-60'}`}
                         >
                           <span className={`text-[10px] font-bold uppercase ${isSameDay(day, currentDate) ? 'text-[#e0b596]' : 'text-gray-400'}`}>
@@ -1218,7 +1228,12 @@ export function Dashboard({
                   {/* Mobile FAB and Navigation */}
                   <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3">
                     <button
-                      onClick={() => setCurrentDate(new Date())}
+                      onClick={() => {
+                        const now = new Date();
+                        setCurrentDate(now);
+                        setPendingSearchDate(now);
+                        setCompletedSearchDate(now);
+                      }}
                       className="px-6 py-3 bg-white dark:bg-[#292929] border border-gray-200 dark:border-[#333] rounded-full shadow-lg text-[#e0b596] text-sm font-bold flex items-center gap-2 active:scale-95 transition-all"
                     >
                       <ChevronDown className="w-4 h-4 rotate-180" />
@@ -1296,12 +1311,64 @@ export function Dashboard({
                       </div>
                     </div>
                   )}
+
+                  {activeView === 'pending' && (
+                    <div className="flex items-center gap-2">
+                      {pendingSearchDate && (
+                        <button
+                          onClick={() => setPendingSearchDate(undefined)}
+                          className="text-xs font-medium text-gray-500 hover:text-[#e0b596] transition-colors"
+                        >
+                          Clear filter
+                        </button>
+                      )}
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowPendingCalendar(!showPendingCalendar)}
+                          className={`p-2 rounded-lg transition-all ${pendingSearchDate ? 'bg-[#e0b596] text-white shadow-lg shadow-[#e0b596]/30' : 'bg-white dark:bg-[#292929] text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-[#333] hover:border-[#e0b596]'}`}
+                          title="Search by date"
+                        >
+                          <Search className="w-5 h-5" />
+                        </button>
+
+                        {showPendingCalendar && (
+                          <div className="absolute top-full right-0 mt-2 p-2 bg-white dark:bg-[#292929] border border-gray-200 dark:border-[#333] rounded-lg shadow-2xl z-50">
+                            <DayPicker
+                              mode="single"
+                              selected={pendingSearchDate}
+                              onSelect={(date) => {
+                                setPendingSearchDate(date);
+                                setShowPendingCalendar(false);
+                              }}
+                              modifiers={{
+                                today: new Date()
+                              }}
+                              modifiersStyles={{
+                                today: { border: '2px solid #e0b596', fontWeight: 'bold', borderRadius: '50%' },
+                                selected: { backgroundColor: '#e0b596', color: 'white' }
+                              }}
+                              styles={{
+                                root: { color: theme === 'dark' ? '#f5f5f5' : '#1f2937', backgroundColor: theme === 'dark' ? '#292929' : '#ffffff' },
+                                day: { color: theme === 'dark' ? '#e0e0e0' : '#374151' },
+                                caption: { color: theme === 'dark' ? '#f5f5f5' : '#111827' }
+                              }}
+                              showOutsideDays
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="grid gap-4">
                   {(() => {
                     const filteredTasks = sanitizedTasks
                       .filter(t => {
-                        if (activeView === 'pending') return !t.completed;
+                        if (activeView === 'pending') {
+                          if (t.completed) return false;
+                          if (!pendingSearchDate) return true;
+                          return isSameDay(parseISO(t.date), pendingSearchDate);
+                        }
 
                         // Completed view
                         if (!t.completed) return false;
@@ -1349,13 +1416,16 @@ export function Dashboard({
                         ))}
                         {filteredTasks.length === 0 && (
                           <div className="text-center py-20 text-gray-500 dark:text-gray-400">
-                            <p className="text-lg">No {activeView === 'completed' ? 'completed' : 'pending'} tasks found {completedSearchDate ? `for ${format(completedSearchDate, 'MMMM d, yyyy')}` : ''}.</p>
-                            {completedSearchDate && (
+                            <p className="text-lg">
+                              No {activeView === 'completed' ? 'completed' : 'pending'} tasks found
+                              {(activeView === 'completed' ? completedSearchDate : pendingSearchDate) ? ` for ${format(activeView === 'completed' ? completedSearchDate! : pendingSearchDate!, 'MMMM d, yyyy')}` : ''}.
+                            </p>
+                            {(activeView === 'completed' ? completedSearchDate : pendingSearchDate) && (
                               <button
-                                onClick={() => setCompletedSearchDate(undefined)}
+                                onClick={() => activeView === 'completed' ? setCompletedSearchDate(undefined) : setPendingSearchDate(undefined)}
                                 className="mt-2 text-[#e0b596] hover:underline text-sm font-medium"
                               >
-                                Show all completed tasks
+                                Show all {activeView === 'completed' ? 'completed' : 'pending'} tasks
                               </button>
                             )}
                           </div>

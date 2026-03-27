@@ -123,6 +123,13 @@ export default function App() {
         const data = await res.json();
         console.log('Fetched tasks:', data); // Added logging
         setTasks(data);
+      } else if (res.status === 401) {
+        toast.error('Session expired. Please sign in again.');
+        setUser(null);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      } else {
+        console.error('Failed to fetch tasks, status:', res.status);
       }
     } catch (err) {
       console.error('Failed to fetch tasks:', err);
@@ -163,6 +170,13 @@ export default function App() {
       if (res.ok) {
         const newTask = await res.json();
         setTasks(prev => [...prev, newTask]);
+      } else if (res.status === 401) {
+        toast.error('Session expired. Please sign in again.');
+        setUser(null);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      } else {
+        toast.error('Failed to save task to server');
       }
     } catch (err) {
       console.error('Failed to add task:', err);
